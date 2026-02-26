@@ -482,8 +482,11 @@ export function runAnalysis() {
     for (const rule of RULES) {
         const res = rule.check(S.nodes, S.edges, adj);
         if (res) {
-            S.threats.push({ ...rule, affected: res.aff || [] });
-            (res.aff || []).forEach(nid => {
+            // Build location names from affected node IDs
+            const affIds = res.aff || [];
+            const locationNames = [...new Set(affIds.map(nid => S.nodes[nid]?.label || nid).filter(Boolean))];
+            S.threats.push({ ...rule, affected: affIds, locationNames });
+            affIds.forEach(nid => {
                 const pp2 = document.getElementById('pills-' + nid);
                 if (pp2 && !pp2.querySelector(`[data-t="${rule.id}"]`)) {
                     const pill = document.createElement('span');
@@ -500,8 +503,10 @@ export function runAnalysis() {
     // Step 3b: Evaluate custom rules (declarative engine)
     const customThreats = evaluateCustomRules(S.nodes, S.edges, adj);
     for (const ct of customThreats) {
-        S.threats.push({ ...ct, affected: ct.affected || [] });
-        (ct.affected || []).forEach(nid => {
+        const ctAffIds = ct.affected || [];
+        const ctLocationNames = [...new Set(ctAffIds.map(nid => S.nodes[nid]?.label || nid).filter(Boolean))];
+        S.threats.push({ ...ct, affected: ctAffIds, locationNames: ctLocationNames });
+        ctAffIds.forEach(nid => {
             const pp2 = document.getElementById('pills-' + nid);
             if (pp2 && !pp2.querySelector(`[data-t="${ct.id}"]`)) {
                 const pill = document.createElement('span');

@@ -789,6 +789,53 @@ select.inp {
   color: var(--accent);
 }
 
+/* ═══ THREAT LOCATION BADGE ═══ */
+.tc-location {
+  font-size: 9px;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--info);
+  margin-top: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: .8;
+}
+
+/* ═══ THREAT HOVER → CANVAS HIGHLIGHT ═══ */
+@keyframes threat-pulse {
+
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, .6), 0 0 20px rgba(239, 68, 68, .3);
+  }
+
+  50% {
+    box-shadow: 0 0 0 5px rgba(239, 68, 68, .8), 0 0 30px rgba(239, 68, 68, .5);
+  }
+}
+
+.node.threat-hover-highlight {
+  animation: threat-pulse .8s ease-in-out infinite;
+  border-color: var(--crit) !important;
+  z-index: 50 !important;
+  transform: scale(1.03);
+  transition: transform .2s ease;
+}
+
+/* SVG edge highlight when hovering a threat */
+.edge-threat-highlight {
+  stroke: var(--crit) !important;
+  stroke-width: 3px !important;
+  filter: drop-shadow(0 0 6px rgba(239, 68, 68, .7)) !important;
+  pointer-events: none;
+}
+
+/* Threat card hover state — subtle left-border glow */
+.threat-card:hover {
+  border-left: 3px solid var(--accent);
+  background: var(--s3);
+}
+
 .atk-btn {
   padding: 7px 10px;
   background: var(--s2);
