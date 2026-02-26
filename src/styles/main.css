@@ -2425,3 +2425,76 @@ select.inp {
   padding-top: 12px;
   border-top: 1px solid var(--border);
 }
+
+/* ═══ GLOSSARY TOOLTIPS ═══ */
+.glossary-term {
+  position: relative;
+  border-bottom: 1px dotted var(--info);
+  cursor: help;
+  color: var(--text);
+  transition: color .15s;
+}
+
+.glossary-term:hover {
+  color: var(--info);
+}
+
+.glossary-icon {
+  font-size: 8px;
+  color: var(--info);
+  opacity: .6;
+  vertical-align: super;
+  margin-left: 1px;
+  transition: opacity .15s;
+}
+
+.glossary-term:hover .glossary-icon {
+  opacity: 1;
+}
+
+/* Tooltip via title attribute — enhanced with CSS for consistent look */
+.glossary-term::after {
+  content: attr(title);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--s3);
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.5;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, .5);
+  white-space: normal;
+  width: max-content;
+  max-width: 280px;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity .2s, visibility .2s;
+}
+
+.glossary-term::before {
+  content: '';
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: var(--border);
+  z-index: 10000;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity .2s, visibility .2s;
+}
+
+.glossary-term:hover::after,
+.glossary-term:hover::before {
+  opacity: 1;
+  visibility: visible;
+}

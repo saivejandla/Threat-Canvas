@@ -4,6 +4,7 @@
 import { S, strideFilter, setStrideFilter } from '../state/state.js';
 import { sc, sn, scolor, rr } from '../utils/helpers.js';
 import { clearAttackPathHighlights } from '../engine/attackPaths.js';
+import { injectGlossaryTooltips } from '../utils/glossary.js';
 
 export function renderDetected() {
     const con = document.getElementById('detectedThreats');
@@ -27,8 +28,8 @@ export function renderDetected() {
       <div class="tc-body" id="tc-body-${t.id}" style="display:none;margin-top:8px">
         <span class="tc-stride" style="color:${scolor(t.stride)};border-color:${scolor(t.stride)}44">${sn(t.stride)}</span>
         ${owaspBadge}
-        <div class="tc-desc">${t.desc}</div>
-        ${t.mits.map(m => `<div class="tc-mit">${m}</div>`).join('')}
+        <div class="tc-desc">${injectGlossaryTooltips(t.desc)}</div>
+        ${t.mits.map(m => `<div class="tc-mit">${injectGlossaryTooltips(m)}</div>`).join('')}
       </div>
     </div>`;
     }).join('');
