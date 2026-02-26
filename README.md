@@ -21,6 +21,8 @@
   <strong>multi-hop blast radius simulation</strong>, and <strong>attack path detection</strong> — entirely in your browser.
 </p>
 
+> **Note**: This started as a fun passion project / vibe-coding experiment and grew into something genuinely useful. It's not affiliated with OWASP or any company — just a solo developer exploring what's possible with vanilla JavaScript and graph algorithms. Feedback, issues, and contributions are welcome!
+
 ---
 
 ## ✨ Features
@@ -74,7 +76,7 @@ A **6-factor model** that simulates what happens when a node is compromised:
 Zero external dependencies. Pure vanilla **HTML + CSS + ES6 Modules**.
 
 ```
-threat-model-app/
+Threat-Canvas/
 ├── index.html                    ← Single-page application
 ├── src/
 │   ├── main.js                   ← Entry point & event wiring
@@ -118,7 +120,7 @@ threat-model-app/
 ```bash
 # Clone the repository
 git clone https://github.com/saivejandla/Threat-Canvas.git
-cd Threat-Canvas/threat\ 2/threat-model-app
+cd Threat-Canvas
 
 # Option 1: Python (built-in)
 python -m http.server 8080
