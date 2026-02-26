@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="#features"><img src="https://img.shields.io/badge/Rules-23%20Built--in%20+%2016%20Custom-f59e0b?style=flat-square" alt="Rules"/></a>
-  <a href="#features"><img src="https://img.shields.io/badge/Components-19%20Types-60a5fa?style=flat-square" alt="Components"/></a>
+  <a href="#features"><img src="https://img.shields.io/badge/Components-18%20Types-60a5fa?style=flat-square" alt="Components"/></a>
   <a href="#features"><img src="https://img.shields.io/badge/Blast%20Radius-6--Factor%20Model-ef4444?style=flat-square" alt="Blast Radius"/></a>
   <a href="#license"><img src="https://img.shields.io/badge/License-MIT-34d399?style=flat-square" alt="License"/></a>
   <a href="#getting-started"><img src="https://img.shields.io/badge/Dependencies-Zero-f97316?style=flat-square" alt="Zero Deps"/></a>
@@ -21,7 +21,14 @@
   <strong>multi-hop blast radius simulation</strong>, and <strong>attack path detection</strong> — entirely in your browser.
 </p>
 
-> **Note**: This started as a fun passion project / vibe-coding experiment and grew into something genuinely useful. It's not affiliated with OWASP or any company — just a solo developer exploring what's possible with vanilla JavaScript and graph algorithms. Feedback, issues, and contributions are welcome!
+> ### 💬 About This Project
+> This tool was born out of a vibe-coding experiment. I'm not a software developer — I don't write code in the traditional sense. But I work in security, I understand threat modeling, and I wanted to see how far AI-assisted development could take a real idea. Two weeks later, this is the result.
+>
+> **My goal is to make threat modeling more accessible** — not just for experienced security engineers, but especially for beginners breaking into the field. Threat modeling is one of the most important skills in security, but most people never learn it because the tools are either too expensive or too intimidating. I want Threat-Canvas to be the tool I wish I had when I was starting out — something visual, interactive, and free that teaches you how threats work by showing you, not just telling you.
+>
+> Most free tools are either too simple (just checklists) or too complex (enterprise platforms with steep learning curves). Threat-Canvas sits in the middle — visual enough to learn from, automated enough to be useful in real work, and free forever.
+>
+> This is not affiliated with OWASP or any company. It's a solo project built with AI assistance, and I'm serious about improving it. If you're a security engineer, student, pentester, or architect — your feedback would mean a lot. Issues, PRs, and feature requests are all welcome. Let's make security tooling better together.
 
 ---
 
@@ -29,7 +36,7 @@
 
 ### 🔍 Automated STRIDE Threat Detection
 - **23 built-in rules** that evaluate the full graph topology using BFS/DFS — not simple template matching
-- Rules map to **OWASP Top 10 2021** (A01–A07)
+- Rules align with **OWASP Top 10 2021** principles (auth, data exposure, injection paths, misconfigurations)
 - Multi-step analysis: chains conditions across nodes, edges, and trust boundaries
 - Data normalization engine standardizes trust zones, data classifications, IAM privileges, and auth/encryption properties before rule evaluation
 
@@ -60,7 +67,7 @@ A **6-factor model** that simulates what happens when a node is compromised:
 - Visual overlay on the DFD canvas with animated attack path edges
 
 ### 🏗️ Data Flow Diagram Builder
-- **19 component types** across External, Network, Compute, and Data categories
+- **18 component types** across External, Network, Compute, and Data categories
 - Drag-and-drop canvas with zoom/pan and fit-to-view
 - 4 trust zone swim lanes: Internet, DMZ, Internal, Restricted
 - Edge properties: protocol, data classification, auth method, encryption, trust boundary
@@ -83,7 +90,7 @@ Threat-Canvas/
 │   ├── state/
 │   │   └── state.js              ← Centralized singleton state
 │   ├── engine/                   ← DOM-free, testable logic
-│   │   ├── componentDefs.js      ← 19 node types, 50+ threat profiles
+│   │   ├── componentDefs.js      ← 18 node types, 50+ threat profiles
 │   │   ├── graphEngine.js        ← BFS, DFS, adjacency, path-finding
 │   │   ├── threatEngine.js       ← 23 STRIDE rules + analysis orchestrator
 │   │   ├── blastRadius.js        ← 6-factor blast radius model
