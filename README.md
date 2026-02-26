@@ -20,15 +20,16 @@
   A client-side, zero-dependency threat modeling tool that performs <strong>automated graph-aware STRIDE analysis</strong>,<br/>
   <strong>multi-hop blast radius simulation</strong>, and <strong>attack path detection</strong> — entirely in your browser.
 </p>
+> ⚠️ **Project Status: Vibe-Coding Experiment**
+>
+> This started two weeks ago as a fun, experimental learning project. The code under the hood might be a bit of a Frankenstein monster, but the tool actually works! If you are looking for enterprise-grade, perfectly optimized code, you won't find it here. But if you want a free, visual way to explore threat modeling—welcome!
 
 > ### 💬 About This Project
-> This tool was born out of a vibe-coding experiment. I'm not a software developer — I don't write code in the traditional sense. But I work in security, I understand threat modeling, and I wanted to see how far AI-assisted development could take a real idea. Two weeks later, this is the result.
+> This tool was born out of a vibe-coding experiment. I'm not a software developer — I don't write code in the traditional sense. But I work in security, and I built this because I wanted a hands-on way to learn more about threat modeling myself. I wanted to see exactly how far AI-assisted development could take a real idea, and two weeks later, this is the result.
 >
-> **My goal is to make threat modeling more accessible** — not just for experienced security engineers, but especially for beginners breaking into the field. Threat modeling is one of the most important skills in security, but most people never learn it because the tools are either too expensive or too intimidating. I want Threat-Canvas to be the tool I wish I had when I was starting out — something visual, interactive, and free that teaches you how threats work by showing you, not just telling you.
+> **My goal is to make threat modeling more accessible.** Most free tools are either too simple (just checklists) or too complex (enterprise platforms with steep learning curves). Threat-Canvas sits in the middle — visual, automated, and free forever.
 >
-> Most free tools are either too simple (just checklists) or too complex (enterprise platforms with steep learning curves). Threat-Canvas sits in the middle — visual enough to learn from, automated enough to be useful in real work, and free forever.
->
-> This is not affiliated with OWASP or any company. It's a solo project built with AI assistance, and I'm serious about improving it. If you're a security engineer, student, pentester, or architect — your feedback would mean a lot. Issues, PRs, and feature requests are all welcome. Let's make security tooling better together.
+> This is not affiliated with OWASP or any company. It's a solo project, and I'm serious about improving it. If you're a security engineer, pentester, architect, or a developer who wants to help clean up the codebase — your feedback would mean a lot. Issues, PRs, and feature requests are all highly welcome. Let's make security tooling better together.
 
 ---
 
