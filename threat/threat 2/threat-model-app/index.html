@@ -27,6 +27,7 @@
       <button class="btn btn-ghost btn-sm" id="loadBtn" title="Restore project from JSON">📂 Load Project</button>
       <input type="file" id="loadInput" accept=".json,application/json" style="display:none">
       <div style="width:1px;height:16px;background:var(--border)"></div>
+      <button class="btn btn-ghost btn-sm" id="openRulesBtn" title="Custom threat rules engine">⚙ Rules Engine</button>
       <button class="btn btn-primary btn-sm" id="exportBtn">⬇ Export Report</button>
     </div>
   </header>
@@ -833,6 +834,21 @@
       </div>
     </div>
   </div>
+
+  <!-- ─── RULE EDITOR MODAL ─── -->
+  <div class="overlay" id="ruleEditorModal">
+    <div class="re-modal">
+      <div class="re-modal-header">
+        <div>
+          <div class="re-modal-title">⚙ Custom Rule Engine</div>
+          <div class="re-modal-subtitle">Create, manage, and import domain-specific threat rules</div>
+        </div>
+        <button class="exec-close" id="closeRulesBtn">✕</button>
+      </div>
+      <div id="ruleEditorContent"></div>
+    </div>
+  </div>
+
   <script type="module" src="src/main.js"></script>
 </body>
 

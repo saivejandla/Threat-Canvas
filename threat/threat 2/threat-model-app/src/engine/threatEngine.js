@@ -1,6 +1,7 @@
 /**
  * THREAT ENGINE — OWASP STRIDE Rule Evaluation
  * Contains the RULES array and the runAnalysis() orchestrator.
+ * Now also evaluates custom rules from the declarative rule engine.
  */
 import { S, S_attackPaths, S_boundaryFindings } from '../state/state.js';
 import { DEFS } from './componentDefs.js';
@@ -9,6 +10,7 @@ import { sc } from '../utils/helpers.js';
 import { runFullAnalysis } from './attackPaths.js';
 import { renderDetected } from '../ui/assessUI.js';
 import { renderCM } from '../ui/assessUI.js';
+import { evaluateCustomRules, getCustomRules } from './customRules.js';
 
 // ═══ THREAT RULES (OWASP STRIDE) ═══
 export const RULES = [
@@ -465,6 +467,23 @@ export function runAnalysis() {
             });
             if (!S.cmRows[rule.id]) S.cmRows[rule.id] = { response: 'Mitigate', status: 'Non-Mitigated' };
         }
+    }
+    // Step 3b: Evaluate custom rules (declarative engine)
+    const customThreats = evaluateCustomRules(S.nodes, S.edges, adj);
+    for (const ct of customThreats) {
+        S.threats.push({ ...ct, affected: ct.affected || [] });
+        (ct.affected || []).forEach(nid => {
+            const pp2 = document.getElementById('pills-' + nid);
+            if (pp2 && !pp2.querySelector(`[data-t="${ct.id}"]`)) {
+                const pill = document.createElement('span');
+                pill.className = 'pill';
+                pill.dataset.t = ct.id;
+                pill.style.cssText = `background:${sc(ct.sev)}22;color:${sc(ct.sev)};border:1px solid ${sc(ct.sev)}55`;
+                pill.textContent = ct.id;
+                pp2.appendChild(pill);
+            }
+        });
+        if (!S.cmRows[ct.id]) S.cmRows[ct.id] = { response: 'Mitigate', status: 'Non-Mitigated' };
     }
     // Step 4: Full unified analysis pipeline
     runFullAnalysis(S.nodes, S.edges);
