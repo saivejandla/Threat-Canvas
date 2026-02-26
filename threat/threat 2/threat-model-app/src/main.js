@@ -14,6 +14,7 @@ import { exportReport, saveProject, loadProject, loadExample } from './ui/export
 import { openExecSummary, closeExecSummary } from './ui/execSummary.js';
 import { renderTrustZoneOverlays } from './ui/trustZones.js';
 import { upHint } from './utils/helpers.js';
+import { openRuleEditor, closeRuleEditor, initRuleEditor } from './ui/ruleEditorUI.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     // Init
@@ -21,6 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setMode('analyze');
     initZoomPan();
     initCanvas();
+    initRuleEditor();
 
     // ── Step Tabs ──
     document.querySelectorAll('.step-tab').forEach((tab, i) => {
@@ -81,6 +83,10 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('clearBtn')?.addEventListener('click', clearCanvas);
     document.getElementById('exampleBtn')?.addEventListener('click', loadExample);
     document.getElementById('exampleBtnHint')?.addEventListener('click', loadExample);
+
+    // ── Rules Engine ──
+    document.getElementById('openRulesBtn')?.addEventListener('click', openRuleEditor);
+    document.getElementById('closeRulesBtn')?.addEventListener('click', closeRuleEditor);
 
     // ── Next: Build DFD ──
     document.getElementById('nextDfdBtn')?.addEventListener('click', () => goStep(2));
