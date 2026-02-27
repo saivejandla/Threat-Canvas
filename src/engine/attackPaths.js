@@ -341,14 +341,22 @@ export function runFullAnalysis(nodes, edges) {
                 S.threats.push({ ...f });
                 (f.affected || []).forEach(nid => {
                     const pp2 = document.getElementById('pills-' + nid);
-                    if (pp2 && !pp2.querySelector('[data-t="' + f.id + '"]')) {
-                        const pill = document.createElement('span');
-                        pill.className = 'pill';
-                        pill.dataset.t = f.id;
-                        pill.style.cssText = `background:${sc(f.sev)}22;color:${sc(f.sev)};border:1px solid ${sc(f.sev)}55`;
-                        pill.textContent = f.id;
-                        pp2.appendChild(pill);
+                    if (!pp2 || pp2.querySelector('[data-t="' + f.id + '"]')) return;
+                    const existingOverflow = pp2.querySelector('.pill-overflow');
+                    const visiblePills = pp2.querySelectorAll('.pill').length;
+                    if (visiblePills >= 3 || existingOverflow) {
+                        let ov = existingOverflow;
+                        if (!ov) { ov = document.createElement('span'); ov.className = 'pill-overflow'; pp2.appendChild(ov); }
+                        ov.dataset.extra = (parseInt(ov.dataset.extra || '0') + 1).toString();
+                        ov.textContent = `+${ov.dataset.extra} more`;
+                        return;
                     }
+                    const pill = document.createElement('span');
+                    pill.className = 'pill';
+                    pill.dataset.t = f.id;
+                    pill.style.cssText = `background:${sc(f.sev)}22;color:${sc(f.sev)};border:1px solid ${sc(f.sev)}55`;
+                    pill.textContent = f.id;
+                    pp2.appendChild(pill);
                 });
                 if (!S.cmRows[f.id]) S.cmRows[f.id] = { response: 'Mitigate', status: 'Non-Mitigated' };
             }

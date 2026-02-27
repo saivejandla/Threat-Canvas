@@ -37,6 +37,7 @@ export function showComponentThreats(nodeId) {
   const tzColorMap = { internet: '#ff6b6b', dmz: '#ff8c00', internal: '#60a5fa', secure: '#34d399' };
   const ndTZ = nd.trustZone || 'internal';
   const tzC = tzColorMap[ndTZ] || '#60a5fa';
+
   section.innerHTML = `<div class="ctp-panel">
     <div class="ctp-header">
       <span class="ctp-icon">${def.icon}</span>
@@ -48,54 +49,73 @@ export function showComponentThreats(nodeId) {
       <span style="font-size:10px;font-weight:800;font-family:'JetBrains Mono',monospace;padding:2px 8px;border-radius:3px;background:${tzC}18;color:${tzC};border:1px solid ${tzC}33">${ndTZ.toUpperCase()}</span>
     </div>
 
-    <div class="np-panel" style="margin-bottom:8px">
-      <div class="np-title">⚙️ Blast Radius Properties</div>
-      <div class="np-row">
-        <div class="np-fg">
-          <span class="np-lbl">Network Zone</span>
-          <select class="np-sel" data-action="updateNodeProp" data-node="${nodeId}" data-prop="zone">
-            ${opt([['public', '🌐 Public'], ['dmz', '🔶 DMZ'], ['private', '🔵 Private'], ['isolated', '🟢 Isolated']], nd.zone || 'private')}
-          </select>
+    <div class="ctp-tabs">
+      <button class="ctp-tab active" data-ctp-tab="props">Properties</button>
+      <button class="ctp-tab" data-ctp-tab="threats">Threats${threats.length ? ` (${threats.length})` : ''}</button>
+    </div>
+
+    <div class="ctp-tab-content" id="ctpTabProps">
+      <div class="np-panel" style="margin-bottom:8px">
+        <div class="np-title">⚙️ Blast Radius Properties</div>
+        <div class="np-row">
+          <div class="np-fg">
+            <span class="np-lbl">Network Zone</span>
+            <select class="np-sel" data-action="updateNodeProp" data-node="${nodeId}" data-prop="zone">
+              ${opt([['public', '🌐 Public'], ['dmz', '🔶 DMZ'], ['private', '🔵 Private'], ['isolated', '🟢 Isolated']], nd.zone || 'private')}
+            </select>
+          </div>
+          <div class="np-fg">
+            <span class="np-lbl">IAM Privilege</span>
+            <select class="np-sel" data-action="updateNodeProp" data-node="${nodeId}" data-prop="iamPriv">
+              ${opt([['none', 'None'], ['standard', 'Standard'], ['assumerole', 'AssumeRole'], ['admin', 'Admin']], nd.iamPriv || 'standard')}
+            </select>
+          </div>
+        </div>
+        <div class="np-row">
+          <div class="np-fg">
+            <span class="np-lbl">Trust Zone</span>
+            <select class="np-sel" data-action="updateNodeTrustZone" data-node="${nodeId}">
+              ${opt([['internet', '🌐 Internet'], ['dmz', '🔶 DMZ'], ['internal', '🔵 Internal'], ['restricted', '🔒 Restricted']], nd.trustZone || 'internal')}
+            </select>
+          </div>
+          <div class="np-fg">
+            <span class="np-lbl">Data Class</span>
+            <select class="np-sel" data-action="updateNodeProp" data-node="${nodeId}" data-prop="props.dataClassification">
+              ${opt([['public', 'Public'], ['internal', 'Internal'], ['pii', 'PII'], ['secret', 'Secret']], nd.props?.dataClassification || 'internal')}
+            </select>
+          </div>
         </div>
         <div class="np-fg">
-          <span class="np-lbl">IAM Privilege</span>
-          <select class="np-sel" data-action="updateNodeProp" data-node="${nodeId}" data-prop="iamPriv">
-            ${opt([['none', 'None'], ['standard', 'Standard'], ['assumerole', 'AssumeRole'], ['admin', 'Admin']], nd.iamPriv || 'standard')}
+          <span class="np-lbl">Compromise Impact</span>
+          <select class="np-sel" data-action="updateNodeProp" data-node="${nodeId}" data-prop="compromiseImpact">
+            ${opt([['low', 'Low — limited blast, scoped credentials'], ['medium', 'Medium — typical internal service'], ['high', 'High — admin/deploy pipeline, bypasses scoping']], nd.compromiseImpact || 'medium')}
           </select>
         </div>
-      </div>
-      <div class="np-row">
-        <div class="np-fg">
-          <span class="np-lbl">Trust Zone</span>
-          <select class="np-sel" data-action="updateNodeTrustZone" data-node="${nodeId}">
-            ${opt([['internet', '🌐 Internet'], ['dmz', '🔶 DMZ'], ['internal', '🔵 Internal'], ['restricted', '🔒 Restricted']], nd.trustZone || 'internal')}
-          </select>
-        </div>
-        <div class="np-fg">
-          <span class="np-lbl">Data Class</span>
-          <select class="np-sel" data-action="updateNodeProp" data-node="${nodeId}" data-prop="props.dataClassification">
-            ${opt([['public', 'Public'], ['internal', 'Internal'], ['pii', 'PII'], ['secret', 'Secret']], nd.props?.dataClassification || 'internal')}
-          </select>
-        </div>
-      </div>
-      <div class="np-fg">
-        <span class="np-lbl">Compromise Impact</span>
-        <select class="np-sel" data-action="updateNodeProp" data-node="${nodeId}" data-prop="compromiseImpact">
-          ${opt([['low', 'Low — limited blast, scoped credentials'], ['medium', 'Medium — typical internal service'], ['high', 'High — admin/deploy pipeline, bypasses scoping']], nd.compromiseImpact || 'medium')}
-        </select>
       </div>
     </div>
 
-    ${threats.length ? `<div class="ctp-stride-row">${strides.map(s => `<span class="ctp-badge" style="color:${strideColors[s]};border-color:${strideColors[s]}44;background:${strideColors[s]}18">${strideNames[s]}</span>`).join('')}</div>
-    ${threats.map(t => `
-      <div class="ctp-threat" style="border-left-color:${sevColor[t.sev]}">
-        <div class="ctp-tname"><span style="color:${sevColor[t.sev]};font-size:9px;font-family:'JetBrains Mono',monospace;margin-right:5px">${t.sev.toUpperCase()}</span>${t.name}</div>
-        ${t.mits.map(m => `<div class="ctp-mit">${injectGlossaryTooltips(m)}</div>`).join('')}
-      </div>`).join('')}` : ''}
+    <div class="ctp-tab-content" id="ctpTabThreats" style="display:none">
+      ${threats.length ? `<div class="ctp-stride-row">${strides.map(s => `<span class="ctp-badge" style="color:${strideColors[s]};border-color:${strideColors[s]}44;background:${strideColors[s]}18">${strideNames[s]}</span>`).join('')}</div>
+      ${threats.map(t => `
+        <div class="ctp-threat" style="border-left-color:${sevColor[t.sev]}">
+          <div class="ctp-tname"><span style="color:${sevColor[t.sev]};font-size:9px;font-family:'JetBrains Mono',monospace;margin-right:5px">${t.sev.toUpperCase()}</span>${t.name}</div>
+          ${t.mits.map(m => `<div class="ctp-mit">${injectGlossaryTooltips(m)}</div>`).join('')}
+        </div>`).join('')}` : '<div style="text-align:center;color:var(--text3);padding:16px 0;font-size:11px">No component-specific threats for this type.</div>'}
+    </div>
   </div>`;
   section.style.display = 'block';
 
-  // Attach event listeners
+  // Tab switching
+  section.querySelectorAll('.ctp-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      section.querySelectorAll('.ctp-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById('ctpTabProps').style.display = tab.dataset.ctpTab === 'props' ? 'block' : 'none';
+      document.getElementById('ctpTabThreats').style.display = tab.dataset.ctpTab === 'threats' ? 'block' : 'none';
+    });
+  });
+
+  // Close button
   section.querySelector('#ctpCloseBtn')?.addEventListener('click', () => { section.style.display = 'none'; });
   section.querySelectorAll('[data-action="updateNodeProp"]').forEach(sel => {
     sel.addEventListener('change', () => updateNodeProp(sel.dataset.node, sel.dataset.prop, sel.value));
