@@ -3,7 +3,8 @@
  */
 import {
     S, appMode, blastSourceId, setDragType, dragType,
-    S_attackPaths, S_boundaryFindings, S_pathFindings, setAttackPathState, setHighlightedPathIdx
+    S_attackPaths, S_boundaryFindings, S_pathFindings, setAttackPathState, setHighlightedPathIdx,
+    selectedElementId, setSelectedElementId
 } from '../state/state.js';
 import { DEFS } from '../engine/componentDefs.js';
 import { runBlast } from '../engine/blastRadius.js';
@@ -13,6 +14,7 @@ import { _lastBlastDist, _lastBlockedEdges, _lastPrivEscNodes } from '../state/s
 import { showComponentThreats, setMode } from './panelUI.js';
 import { runAnalysis } from '../engine/threatEngine.js';
 import { upHint } from '../utils/helpers.js';
+import { renderDetected } from './assessUI.js';
 
 export function createNode(type, x, y) {
     const def = DEFS[type]; if (!def) return;
@@ -73,6 +75,9 @@ export function selNode(id) {
     } else {
         showComponentThreats(id);
         document.getElementById('edgeEditorSection').style.display = 'none';
+        // Click-to-filter: filter threat list to this node
+        setSelectedElementId(id);
+        if (S.threats.length) renderDetected();
     }
 }
 
@@ -142,6 +147,22 @@ export function initCanvas() {
         const id = createNode(dragType, x, y);
         setDragType(null); upHint(S.nodes);
         if (id) { setMode('analyze'); showComponentThreats(id); }
+    });
+
+    // Click canvas background → clear node filter
+    canvasWrap.addEventListener('mousedown', e => {
+        // Only trigger on direct canvas background click, not on nodes/ports/edges
+        if (e.target === canvasWrap || e.target.id === 'canvas' || e.target.id === 'viewport') {
+            if (selectedElementId) {
+                setSelectedElementId(null);
+                if (S.threats.length) renderDetected();
+            }
+            if (S.sel) {
+                const prev = document.getElementById(S.sel);
+                if (prev) prev.classList.remove('selected');
+                S.sel = null;
+            }
+        }
     });
 
     // Keyboard
