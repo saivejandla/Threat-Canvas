@@ -533,4 +533,29 @@ export function runAnalysis() {
     document.getElementById('stab3').classList.add('done');
     const apBadge = document.getElementById('apTabBadge');
     if (apBadge) apBadge.textContent = apCount + bvCount;
+
+    // Step 5: Render threat count badges on canvas nodes
+    document.querySelectorAll('.node-threat-badge').forEach(b => b.remove());
+    const nodeThreatCount = {};
+    S.threats.forEach(t => {
+        (t.affected || []).forEach(nid => {
+            nodeThreatCount[nid] = (nodeThreatCount[nid] || 0) + 1;
+        });
+    });
+    for (const [nid, count] of Object.entries(nodeThreatCount)) {
+        const nodeEl = document.getElementById(nid);
+        if (!nodeEl) continue;
+        const badge = document.createElement('div');
+        badge.className = 'node-threat-badge';
+        badge.textContent = count;
+        badge.title = `${count} threat${count > 1 ? 's' : ''} affecting this component`;
+        // Severity-based color: red if any critical, orange if high, yellow otherwise
+        const nodeThreats = S.threats.filter(t => (t.affected || []).includes(nid));
+        const hasCrit = nodeThreats.some(t => t.sev === 'critical');
+        const hasHigh = nodeThreats.some(t => t.sev === 'high');
+        if (hasCrit) badge.classList.add('badge-critical');
+        else if (hasHigh) badge.classList.add('badge-high');
+        else badge.classList.add('badge-medium');
+        nodeEl.appendChild(badge);
+    }
 }
