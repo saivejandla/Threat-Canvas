@@ -126,6 +126,8 @@ export const RULES = [
     {
         id: 'T-009', name: 'Single Point of Failure — No LB', stride: 'D', sev: 'medium', like: 'Medium', imp: 'Medium', cat: 'Denial of Service', ctrl: 'Availability',
         check: (N, E, adj) => {
+            // Suppress for small models (≤5 nodes) — too noisy for beginners
+            if (Object.keys(N).length <= 5) return null;
             const lb = Object.values(N).some(n => n.type === 'loadbalancer');
             const wc = Object.values(N).filter(n => ['webserver', 'api'].includes(n.type)).length;
             return (wc > 0 && !lb) ? { aff: [] } : null;
@@ -169,6 +171,8 @@ export const RULES = [
     {
         id: 'T-012', name: 'No Centralized Identity Provider', stride: 'S', sev: 'medium', like: 'Medium', imp: 'Medium', cat: 'Spoofing', ctrl: 'Authentication',
         check: (N, E, adj) => {
+            // Suppress for small models (≤5 nodes) — too noisy for beginners
+            if (Object.keys(N).length <= 5) return null;
             const idp = Object.values(N).some(n => n.type === 'idp');
             const usr = Object.values(N).some(n => n.type === 'user');
             return (usr && !idp) ? { aff: [] } : null;
@@ -264,6 +268,31 @@ export const RULES = [
         },
         desc: 'Internet-facing nodes have a directed path to internal services with no explicit trust validation. Supply chain or dependency tampering can propagate inward.',
         mits: ['Pin and verify all external dependencies (SBOMs)', 'Enforce input validation at every trust boundary', 'Use network egress filtering to limit outbound connections']
+    },
+
+    {
+        id: 'T-018', name: 'Missing Data Classification on Data Store', stride: 'I', sev: 'medium', like: 'Medium', imp: 'High', cat: 'Information Disclosure', ctrl: 'Confidentiality',
+        check: (N, E, adj) => {
+            const computeTypes = new Set(['webserver', 'api', 'microservice', 'lambda']);
+            const dataTypes = new Set(['database', 'cache', 'storage']);
+            const aff = [];
+            for (const e of E) {
+                const src = N[e.from], dst = N[e.to];
+                if (!src || !dst) continue;
+                if (computeTypes.has(src.type) && dataTypes.has(dst.type)) {
+                    const dc = e.dataClass || e.dataClassification;
+                    if (!dc || dc === 'Public') aff.push(dst.id);
+                }
+            }
+            return aff.length ? { aff: [...new Set(aff)] } : null;
+        },
+        desc: 'A compute node connects to a data store, but the data flow has no sensitivity classification. If this data store holds PII, financial data, or health records, this connection needs encryption and access controls. Set the data classification on this edge to get more targeted threat analysis.',
+        mits: [
+            'Classify the data flowing on this edge (PII, Internal, Confidential)',
+            'Enable TLS/encryption on all data store connections',
+            'Implement least-privilege database access controls',
+            'In threat modeling, data classification drives your security decisions — start here'
+        ]
     },
 
     // ── Enhanced Rule Engine (R-00x) ──
@@ -453,8 +482,11 @@ export function runAnalysis() {
     for (const rule of RULES) {
         const res = rule.check(S.nodes, S.edges, adj);
         if (res) {
-            S.threats.push({ ...rule, affected: res.aff || [] });
-            (res.aff || []).forEach(nid => {
+            // Build location names from affected node IDs
+            const affIds = res.aff || [];
+            const locationNames = [...new Set(affIds.map(nid => S.nodes[nid]?.label || nid).filter(Boolean))];
+            S.threats.push({ ...rule, affected: affIds, locationNames });
+            affIds.forEach(nid => {
                 const pp2 = document.getElementById('pills-' + nid);
                 if (pp2 && !pp2.querySelector(`[data-t="${rule.id}"]`)) {
                     const pill = document.createElement('span');
@@ -471,8 +503,10 @@ export function runAnalysis() {
     // Step 3b: Evaluate custom rules (declarative engine)
     const customThreats = evaluateCustomRules(S.nodes, S.edges, adj);
     for (const ct of customThreats) {
-        S.threats.push({ ...ct, affected: ct.affected || [] });
-        (ct.affected || []).forEach(nid => {
+        const ctAffIds = ct.affected || [];
+        const ctLocationNames = [...new Set(ctAffIds.map(nid => S.nodes[nid]?.label || nid).filter(Boolean))];
+        S.threats.push({ ...ct, affected: ctAffIds, locationNames: ctLocationNames });
+        ctAffIds.forEach(nid => {
             const pp2 = document.getElementById('pills-' + nid);
             if (pp2 && !pp2.querySelector(`[data-t="${ct.id}"]`)) {
                 const pill = document.createElement('span');

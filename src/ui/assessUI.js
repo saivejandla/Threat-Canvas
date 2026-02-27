@@ -1,9 +1,10 @@
 /**
  * ASSESS UI — Countermeasures, STRIDE filter, Assessment checklist, Threat display
  */
-import { S, strideFilter, setStrideFilter } from '../state/state.js';
+import { S, strideFilter, setStrideFilter, setHoveredThreatId } from '../state/state.js';
 import { sc, sn, scolor, rr } from '../utils/helpers.js';
 import { clearAttackPathHighlights } from '../engine/attackPaths.js';
+import { injectGlossaryTooltips } from '../utils/glossary.js';
 
 export function renderDetected() {
     const con = document.getElementById('detectedThreats');
@@ -14,21 +15,25 @@ export function renderDetected() {
         const isEnhanced = t.id && t.id.startsWith('R-');
         const owaspBadge = t.owasp ? `<div style="font-size:9px;font-family:'JetBrains Mono',monospace;color:var(--info);background:rgba(96,165,250,.12);border:1px solid rgba(96,165,250,.3);border-radius:3px;padding:2px 5px;margin-bottom:5px;display:inline-block">🔗 ${t.owasp}</div>` : '';
         const typeBadge = isEnhanced ? `<span style="font-size:8px;background:rgba(245,158,11,.15);color:var(--accent);border:1px solid rgba(245,158,11,.3);border-radius:2px;padding:1px 4px;margin-left:4px;font-family:'JetBrains Mono',monospace">RULE ENGINE</span>` : '';
+        const locNames = (t.locationNames || []).join(', ');
+        const locationBadge = locNames ? `<div class="tc-location">📍 ${locNames}</div>` : '';
+        const affectedJson = JSON.stringify(t.affected || []).replace(/"/g, '&quot;');
         return `
-    <div class="threat-card tc-collapsed" id="tc-${t.id}" data-tc-id="${t.id}">
+    <div class="threat-card tc-collapsed" id="tc-${t.id}" data-tc-id="${t.id}" data-affected="${affectedJson}">
       <div class="tc-head" style="cursor:pointer;margin-bottom:0">
         <div class="sev-dot" style="background:${sc(t.sev)}"></div>
         <div style="flex:1;min-width:0">
           <div class="tc-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.name}</div>
           <div class="tc-id">${t.id}${typeBadge} · <span style="color:${sc(t.sev)}">${t.sev.toUpperCase()}</span></div>
+          ${locationBadge}
         </div>
         <span style="font-size:10px;color:var(--text3);flex-shrink:0;padding-left:4px" id="tc-chevron-${t.id}">▸</span>
       </div>
       <div class="tc-body" id="tc-body-${t.id}" style="display:none;margin-top:8px">
         <span class="tc-stride" style="color:${scolor(t.stride)};border-color:${scolor(t.stride)}44">${sn(t.stride)}</span>
         ${owaspBadge}
-        <div class="tc-desc">${t.desc}</div>
-        ${t.mits.map(m => `<div class="tc-mit">${m}</div>`).join('')}
+        <div class="tc-desc">${injectGlossaryTooltips(t.desc)}</div>
+        ${t.mits.map(m => `<div class="tc-mit">${injectGlossaryTooltips(m)}</div>`).join('')}
       </div>
     </div>`;
     }).join('');
@@ -36,6 +41,38 @@ export function renderDetected() {
     // Attach click listeners for threat cards
     con.querySelectorAll('[data-tc-id]').forEach(card => {
         card.addEventListener('click', () => toggleThreatCard(card.dataset.tcId));
+
+        // Hover: highlight affected nodes on canvas
+        card.addEventListener('mouseenter', () => {
+            const affected = JSON.parse(card.dataset.affected || '[]');
+            setHoveredThreatId(card.dataset.tcId);
+            // Clear previous highlights
+            document.querySelectorAll('.node.threat-hover-highlight').forEach(el => el.classList.remove('threat-hover-highlight'));
+            // Apply highlight to affected nodes
+            affected.forEach(nid => {
+                const el = document.getElementById(nid);
+                if (el) el.classList.add('threat-hover-highlight');
+            });
+            // Also highlight related edges in SVG
+            document.querySelectorAll('.edge-threat-highlight').forEach(el => el.classList.remove('edge-threat-highlight'));
+            const svg = document.getElementById('svgLayer');
+            if (svg) {
+                svg.querySelectorAll('.edge-hit').forEach(hit => {
+                    const eid = hit.dataset.eid;
+                    if (!eid) return;
+                    const edge = S.edges.find(e => e.id === eid);
+                    if (edge && (affected.includes(edge.from) || affected.includes(edge.to))) {
+                        hit.classList.add('edge-threat-highlight');
+                    }
+                });
+            }
+        });
+
+        card.addEventListener('mouseleave', () => {
+            setHoveredThreatId(null);
+            document.querySelectorAll('.node.threat-hover-highlight').forEach(el => el.classList.remove('threat-hover-highlight'));
+            document.querySelectorAll('.edge-threat-highlight').forEach(el => el.classList.remove('edge-threat-highlight'));
+        });
     });
 }
 

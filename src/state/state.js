@@ -68,3 +68,7 @@ export function setHighlightedPathIdx(idx) { _highlightedPathIdx = idx; }
 
 // ── Row counts for scope tables ──
 export const ROW_COUNTS = { deps: 0, entry: 0, exit: 0, assets: 0, trust: 0 };
+
+// ── Threat-to-canvas hover linking ──
+export let hoveredThreatId = null;
+export function setHoveredThreatId(id) { hoveredThreatId = id; }

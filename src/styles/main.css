@@ -789,6 +789,53 @@ select.inp {
   color: var(--accent);
 }
 
+/* ═══ THREAT LOCATION BADGE ═══ */
+.tc-location {
+  font-size: 9px;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--info);
+  margin-top: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: .8;
+}
+
+/* ═══ THREAT HOVER → CANVAS HIGHLIGHT ═══ */
+@keyframes threat-pulse {
+
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, .6), 0 0 20px rgba(239, 68, 68, .3);
+  }
+
+  50% {
+    box-shadow: 0 0 0 5px rgba(239, 68, 68, .8), 0 0 30px rgba(239, 68, 68, .5);
+  }
+}
+
+.node.threat-hover-highlight {
+  animation: threat-pulse .8s ease-in-out infinite;
+  border-color: var(--crit) !important;
+  z-index: 50 !important;
+  transform: scale(1.03);
+  transition: transform .2s ease;
+}
+
+/* SVG edge highlight when hovering a threat */
+.edge-threat-highlight {
+  stroke: var(--crit) !important;
+  stroke-width: 3px !important;
+  filter: drop-shadow(0 0 6px rgba(239, 68, 68, .7)) !important;
+  pointer-events: none;
+}
+
+/* Threat card hover state — subtle left-border glow */
+.threat-card:hover {
+  border-left: 3px solid var(--accent);
+  background: var(--s3);
+}
+
 .atk-btn {
   padding: 7px 10px;
   background: var(--s2);
@@ -2424,4 +2471,77 @@ select.inp {
   margin-top: 14px;
   padding-top: 12px;
   border-top: 1px solid var(--border);
+}
+
+/* ═══ GLOSSARY TOOLTIPS ═══ */
+.glossary-term {
+  position: relative;
+  border-bottom: 1px dotted var(--info);
+  cursor: help;
+  color: var(--text);
+  transition: color .15s;
+}
+
+.glossary-term:hover {
+  color: var(--info);
+}
+
+.glossary-icon {
+  font-size: 8px;
+  color: var(--info);
+  opacity: .6;
+  vertical-align: super;
+  margin-left: 1px;
+  transition: opacity .15s;
+}
+
+.glossary-term:hover .glossary-icon {
+  opacity: 1;
+}
+
+/* Tooltip via title attribute — enhanced with CSS for consistent look */
+.glossary-term::after {
+  content: attr(title);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--s3);
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.5;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, .5);
+  white-space: normal;
+  width: max-content;
+  max-width: 280px;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity .2s, visibility .2s;
+}
+
+.glossary-term::before {
+  content: '';
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: var(--border);
+  z-index: 10000;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity .2s, visibility .2s;
+}
+
+.glossary-term:hover::after,
+.glossary-term:hover::before {
+  opacity: 1;
+  visibility: visible;
 }
