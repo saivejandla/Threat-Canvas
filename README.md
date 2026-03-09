@@ -1,124 +1,234 @@
-# Ollama MCP Server
-An MCP (Model Context Protocol) server for Ollama that enables seamless integration between Ollama's local LLM models and MCP-compatible applications like Claude Desktop.
+<p align="center">
+  <img src="https://img.shields.io/badge/Threat--Canvas-OWASP%20Threat%20Modeler-f59e0b?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0id2hpdGUiPjxwYXRoIGQ9Ik0xMiAxTDMgNXY2YzAgNS41NSAzLjg0IDEwLjc0IDkgMTIgNS4xNi0xLjI2IDktNi40NSA5LTEyVjVsLTktNHoiLz48L3N2Zz4=&logoColor=white" alt="Threat-Canvas Badge" height="40"/>
+</p>
 
-## Features
+<h1 align="center">🛡 Threat-Canvas</h1>
 
-- List available Ollama models
-- Pull new models from Ollama
-- Chat with models using Ollama's chat API
-- Get detailed model information
-- Automatic port management
-- Environment variable configuration
+<p align="center">
+  <strong>Professional OWASP STRIDE Threat Modeler — Zero Dependencies</strong>
+</p>
 
-## Prerequisites
+<p align="center">
+  <a href="#features"><img src="https://img.shields.io/badge/Rules-23%20Built--in%20+%2016%20Custom-f59e0b?style=flat-square" alt="Rules"/></a>
+  <a href="#features"><img src="https://img.shields.io/badge/Components-18%20Types-60a5fa?style=flat-square" alt="Components"/></a>
+  <a href="#features"><img src="https://img.shields.io/badge/Blast%20Radius-6--Factor%20Model-ef4444?style=flat-square" alt="Blast Radius"/></a>
+  <a href="#license"><img src="https://img.shields.io/badge/License-MIT-34d399?style=flat-square" alt="License"/></a>
+  <a href="#getting-started"><img src="https://img.shields.io/badge/Dependencies-Zero-f97316?style=flat-square" alt="Zero Deps"/></a>
+</p>
 
-- Node.js (v16 or higher)
-- npm
-- Ollama installed and running locally
+<p align="center">
+  A client-side, zero-dependency threat modeling tool that performs <strong>automated graph-aware STRIDE analysis</strong>,<br/>
+  <strong>multi-hop blast radius simulation</strong>, and <strong>attack path detection</strong> — entirely in your browser.
+</p>
+> ⚠️ **Project Status: Vibe-Coding Experiment**
+>
+> This started two weeks ago as a fun, experimental learning project. The code under the hood might be a bit of a Frankenstein monster, but the tool actually works! If you are looking for enterprise-grade, perfectly optimized code, you won't find it here. But if you want a free, visual way to explore threat modeling—welcome!
 
-## Installation
+> ### 💬 About This Project
+> This tool was born out of a vibe-coding experiment. I'm not a software developer — I don't write code in the traditional sense. But I work in security, and I built this because I wanted a hands-on way to learn more about threat modeling myself. I wanted to see exactly how far AI-assisted development could take a real idea, and two weeks later, this is the result.
+>
+> **My goal is to make threat modeling more accessible.** Most free tools are either too simple (just checklists) or too complex (enterprise platforms with steep learning curves). Threat-Canvas sits in the middle — visual, automated, and free forever.
+>
+> This is not affiliated with OWASP or any company. It's a solo project, and I'm serious about improving it. If you're a security engineer, pentester, architect, or a developer who wants to help clean up the codebase — your feedback would mean a lot. Issues, PRs, and feature requests are all highly welcome. Let's make security tooling better together.
 
-### Manual Installation
-Install globally via npm:
+---
+
+## ✨ Features
+
+### 🔍 Automated STRIDE Threat Detection
+- **23 built-in rules** that evaluate the full graph topology using BFS/DFS — not simple template matching
+- Rules align with **OWASP Top 10 2021** principles (auth, data exposure, injection paths, misconfigurations)
+- Multi-step analysis: chains conditions across nodes, edges, and trust boundaries
+- Data normalization engine standardizes trust zones, data classifications, IAM privileges, and auth/encryption properties before rule evaluation
+
+### 💥 Blast Radius Simulation (Unique)
+A **6-factor model** that simulates what happens when a node is compromised:
+
+| Factor | What It Evaluates |
+|--------|-------------------|
+| TLS Strength | TLS 1.3 → blocked, None → traversable |
+| Credential Scope | shared / service-bound / vault-managed |
+| Network Route | direct / vpc-peering / none |
+| High Impact | admin IAM or high compromise impact |
+| Detection Probability | SIEM 85%, WAF 60%, Firewall 45%, IdP 70% |
+| Privilege Escalation | admin → all nodes, assumerole → same zone |
+
+### ⚙️ Custom Rule Engine
+- **Declarative DSL** — write rules in JSON, no JavaScript required
+- **9 condition types**: `missing-component`, `path-unguarded`, `node-missing-property`, `edge-missing-property`, and more
+- **4 pre-built compliance packs**: Healthcare (HIPAA), Fintech (PCI-DSS), Cloud-Native (AWS/K8s), Zero Trust (NIST 800-207)
+- Import/export rule packs as JSON for team sharing
+- Rules persist to `localStorage`
+
+### ⚔️ Attack Path Detection
+- BFS-based path finding from all entry points to high-value targets
+- Boundary violation detection across trust zones
+- Privilege escalation path analysis
+- De-duplication by source→target pair (keeps highest-risk variant)
+- Visual overlay on the DFD canvas with animated attack path edges
+
+### 🏗️ Data Flow Diagram Builder
+- **18 component types** across External, Network, Compute, and Data categories
+- Drag-and-drop canvas with zoom/pan and fit-to-view
+- 4 trust zone swim lanes: Internet, DMZ, Internal, Restricted
+- Edge properties: protocol, data classification, auth method, encryption, trust boundary
+- Real-time SVG edge rendering with animated data flow particles
+
+### 📊 Executive Summary & Reporting
+- Security maturity model (Initial → Defined → Managed → Proactive)
+- DREAD risk scoring with detection confidence metrics
+- Prioritized action plan generation
+- Full HTML report export with executive summary, DFD inventory, threat list, and countermeasure details
+
+### 🧩 Architecture
+Zero external dependencies. Pure vanilla **HTML + CSS + ES6 Modules**.
+
+```
+Threat-Canvas/
+├── index.html                    ← Single-page application
+├── src/
+│   ├── main.js                   ← Entry point & event wiring
+│   ├── state/
+│   │   └── state.js              ← Centralized singleton state
+│   ├── engine/                   ← DOM-free, testable logic
+│   │   ├── componentDefs.js      ← 18 node types, 50+ threat profiles
+│   │   ├── graphEngine.js        ← BFS, DFS, adjacency, path-finding
+│   │   ├── threatEngine.js       ← 23 STRIDE rules + analysis orchestrator
+│   │   ├── blastRadius.js        ← 6-factor blast radius model
+│   │   ├── attackPaths.js        ← Attack paths + boundary violations
+│   │   └── customRules.js        ← Declarative rule engine + packs
+│   ├── ui/                       ← All DOM-touching code
+│   │   ├── renderSVG.js          ← Edge rendering
+│   │   ├── zoomPan.js            ← Zoom/pan engine
+│   │   ├── trustZones.js         ← Swim lane overlays
+│   │   ├── scopeUI.js            ← Step navigation
+│   │   ├── panelUI.js            ← Mode toggle, component threats
+│   │   ├── canvasUI.js           ← Node CRUD, drag, connections
+│   │   ├── assessUI.js           ← Countermeasures, STRIDE filter
+│   │   ├── simulationUI.js       ← Traffic simulation
+│   │   ├── execSummary.js        ← Executive summary modal
+│   │   ├── exportUI.js           ← Save/load/export
+│   │   └── ruleEditorUI.js       ← Rule editor modal
+│   ├── styles/
+│   │   └── main.css              ← All styling (~470 lines)
+│   └── utils/
+│       └── helpers.js            ← Shared utilities
+```
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+- Any modern browser (Chrome, Firefox, Edge, Safari)
+- A local HTTP server (required for ES6 modules)
+
+### Run Locally
 
 ```bash
-npm install -g @rawveg/ollama-mcp
+# Clone the repository
+git clone https://github.com/saivejandla/Threat-Canvas.git
+cd Threat-Canvas
+
+# Option 1: Python (built-in)
+python -m http.server 8080
+
+# Option 2: Node.js
+npx serve .
+
+# Option 3: VS Code Live Server extension
+# Right-click index.html → "Open with Live Server"
 ```
 
-### Installing in Other MCP Applications
+Open **http://localhost:8080** in your browser.
 
-To install the Ollama MCP Server in other MCP-compatible applications (like Cline or Claude Desktop), add the following configuration to your application's MCP settings file:
+### Quick Start
+1. Click **"Load Example"** to load a sample College Library architecture
+2. Click **"▶ Analyze Architecture"** to run the STRIDE engine
+3. Explore the **threat pills** on each node, **attack paths** in the right panel
+4. Click any node to see its **component threat profile**
+5. Toggle **blast radius mode** to simulate node compromise
+6. Open **⚙ Rules Engine** to install compliance packs or create custom rules
+7. Click **⬇ Export Report** to generate a full HTML threat model report
 
-```json
-{
-  "mcpServers": {
-    "@rawveg/ollama-mcp": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@rawveg/ollama-mcp"
-      ]
-    }
-  }
-}
-```
+---
 
-The settings file location varies by application:
-- Claude Desktop: `claude_desktop_config.json` in the Claude app data directory
-- Cline: `cline_mcp_settings.json` in the VS Code global storage
+## 🧪 Testing
 
-## Usage
+### Manual Testing
+Load the example architecture and verify:
+- All 23 built-in rules fire correctly
+- Blast radius simulation blocks edges with TLS 1.3 + strong auth
+- Attack paths are detected from internet entry points to databases
+- Custom rule packs install/uninstall correctly
+- Export produces a valid HTML report
 
-### Starting the Server
+### Rule Engine Test Cases
 
-Simply run:
+| Test | Method | Expected |
+|------|--------|----------|
+| T-001 trigger | Internet → API (no WAF) | "No WAF/Firewall" fires |
+| T-001 negative | Internet → WAF → API | Rule does NOT fire |
+| Custom rule | Install Healthcare pack, no SIEM | HC-002 fires |
+| Import/export | Export all → reimport | All rules restored |
+| Blast radius | Compromise node with TLS 1.3 outbound | Edges blocked |
 
-```bash
-ollama-mcp
-```
+> See [`SECURITY_REVIEW.md`](./SECURITY_REVIEW.md) for the complete **43-test-case testing plan** covering rule accuracy, blast radius, attack paths, security, performance, and comparison testing.
 
-The server will start on port 3456 by default. You can specify a different port using the PORT environment variable:
+---
 
-```bash
-PORT=3457 ollama-mcp
-```
+## 🔒 Security
 
-### Environment Variables
+This tool runs **entirely client-side** — no data leaves your browser. Projects are saved as JSON files on your local machine. Custom rules persist to `localStorage`.
 
-- `PORT`: Server port (default: 3456). Can be used when running directly:
-  ```bash
-  # When running directly
-  PORT=3457 ollama-mcp
-  ```
-- `OLLAMA_API`: Ollama API endpoint (default: http://localhost:11434)
+For a detailed security assessment, see the [Security Engineering Review](./SECURITY_REVIEW.md).
 
-### API Endpoints
+---
 
-- `GET /models` - List available models
-- `POST /models/pull` - Pull a new model
-- `POST /chat` - Chat with a model
-- `GET /models/:name` - Get model details
+## 📋 Compliance Packs
 
-## Development
+| Pack | Rules | Framework |
+|------|-------|-----------|
+| 🏥 Healthcare | 4 rules | HIPAA §164.312 |
+| 🏦 Fintech | 5 rules | PCI-DSS Req 1–8 |
+| ☁️ Cloud-Native | 4 rules | AWS/K8s best practices |
+| 🔒 Zero Trust | 3 rules | NIST SP 800-207 |
 
-1. Clone the repository:
-```bash
-git clone https://github.com/rawveg/ollama-mcp.git
-cd ollama-mcp
-```
+Install packs with one click from the **⚙ Rules Engine** modal, or import custom JSON packs created by your team.
 
-2. Install dependencies:
-```bash
-npm install
-```
+---
 
-3. Build the project:
-```bash
-npm run build
-```
+## 🛣️ Roadmap
 
-4. Start the server:
-```bash
-npm start
-```
+- [ ] Auto-save to `localStorage` every 30s
+- [ ] PDF export (jsPDF)
+- [ ] NIST 800-53 control mapping
+- [ ] CVSS 3.1 calculator per threat
+- [ ] JIRA/CSV ticket export
+- [ ] Model versioning with JSON diff
+- [ ] Terraform/CloudFormation import (IaC → DFD)
 
-## Contributing
+---
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+## 🤝 Contributing
 
-However, this does **not** grant permission to incorporate this project into third-party services or commercial platforms without prior discussion and agreement. While I previously accepted contributions (such as a Dockerfile and related README updates) to support integration with services like **Smithery**, recent actions by a similar service ΓÇö **Glama** ΓÇö have required a reassessment of this policy.
+Contributions are welcome! The engine layer (`src/engine/`) is DOM-free and can be unit-tested independently. The UI layer (`src/ui/`) handles all rendering.
 
-Glama has chosen to include open-source MCP projects in their commercial offering without notice or consent, and subsequently created issue requests asking maintainers to perform unpaid work to ensure compatibility with *their* platform. This behaviour ΓÇö leveraging community labour for profit without dialogue or compensation ΓÇö is not only inconsiderate, but **ethically problematic**.
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'feat: add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-As a result, and to protect the integrity of this project and its contributors, the licence has been updated to the **GNU Affero General Public License v3.0 (AGPL-3.0)**. This change ensures that any use of the software ΓÇö particularly in **commercial or service-based platforms** ΓÇö must remain fully compliant with the AGPL's terms **and** obtain a separate commercial licence. Merely linking to the original source is not sufficient where the project is being **actively monetised**. If you wish to include this project in a commercial offering, please get in touch **first** to discuss licensing terms.
+---
 
-## License
+## 📄 License
 
-AGPL v3.0
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
 
-## Related
+---
 
-- [Ollama](https://ollama.ai)
-- [Model Context Protocol](https://github.com/anthropics/model-context-protocol)
-
-This project was previously MIT-licensed. As of 20th April 2025, it is now licensed under AGPL-3.0 to prevent unauthorised commercial exploitation. If your use of this project predates this change, please refer to the relevant Git tag or commit for the applicable licence.
+<p align="center">
+  <strong>Built with ❤️ by <a href="https://github.com/saivejandla">Sai Vejandla</a></strong><br/>
+  <sub>Zero dependencies. Pure browser. Maximum security insight.</sub>
+</p>
