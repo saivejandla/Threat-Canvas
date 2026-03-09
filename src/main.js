@@ -8,7 +8,8 @@ import { createNode, clearCanvas, confirmConn, cancelConn, initCanvas } from './
 import { setMode } from './ui/panelUI.js';
 import { runAnalysis } from './engine/threatEngine.js';
 import { zoomStep, zoomFit, zoomReset, initZoomPan } from './ui/zoomPan.js';
-import { toggleSim, runAttack } from './ui/simulationUI.js';
+import { autoLayout } from './ui/autoLayout.js';
+
 import { filterSTRIDE, switchRpTab } from './ui/assessUI.js';
 import { exportReport, saveProject, loadProject, loadExample } from './ui/exportUI.js';
 import { openExecSummary, closeExecSummary } from './ui/execSummary.js';
@@ -54,12 +55,8 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('zoomOutBtn').addEventListener('click', () => zoomStep(-1));
     document.getElementById('zoomFitBtn').addEventListener('click', zoomFit);
     document.getElementById('zoomResetBtn').addEventListener('click', zoomReset);
+    document.getElementById('autoLayoutBtn')?.addEventListener('click', autoLayout);
 
-    // ── Simulation ──
-    document.getElementById('simToggleBtn').addEventListener('click', toggleSim);
-    document.querySelectorAll('[data-attack]').forEach(btn => {
-        btn.addEventListener('click', () => runAttack(btn.dataset.attack));
-    });
 
     // ── Connection modal ──
     document.getElementById('connOk').addEventListener('click', confirmConn);

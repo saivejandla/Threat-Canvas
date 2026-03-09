@@ -11,6 +11,10 @@ import { runFullAnalysis } from './attackPaths.js';
 import { renderDetected } from '../ui/assessUI.js';
 import { renderCM } from '../ui/assessUI.js';
 import { evaluateCustomRules, getCustomRules } from './customRules.js';
+import { deduplicateThreats } from './deduplication.js';
+import { hasNoAuth, hasWeakAuth, hasNoEncryption, hasDeprecatedTLS, AUTH_STRENGTH, ENCRYPTION_STRENGTH } from './edgeWeights.js';
+import { PROTOCOL_POLICY, TRUST_ZONE_RANK, getNodeTrustZone, isZoneViolation, getViolationSeverity } from './protocolPolicy.js';
+import { scoreThreat } from './cvss.js';
 
 // ═══ THREAT RULES (OWASP STRIDE) ═══
 export const RULES = [
@@ -36,7 +40,8 @@ export const RULES = [
             const aff = [];
             for (const src of untrusted) {
                 for (const api of apis) {
-                    const inEdges = E.filter(e => e.to === api.id && e.auth === 'None');
+                    // Upgraded: flag if auth is completely absent (strength 0)
+                    const inEdges = E.filter(e => e.to === api.id && hasNoAuth(e.auth));
                     if (inEdges.length && findPath(src.id, api.id, adj)) aff.push(api.id);
                 }
             }
@@ -52,13 +57,14 @@ export const RULES = [
             const dbs = Object.values(N).filter(n => n.type === 'database');
             const aff = [];
             for (const db of dbs) {
-                const badEdge = E.find(e => e.to === db.id && e.encryption === 'None');
+                // Upgraded: flag any edge with no encryption (strength 0)
+                const badEdge = E.find(e => e.to === db.id && hasNoEncryption(e.encryption));
                 if (badEdge) aff.push(db.id);
             }
             return aff.length ? { aff } : null;
         },
         desc: 'Database connections transmit plaintext, exposing credentials and sensitive records to eavesdropping.',
-        mits: ['Enable TLS/SSL for all DB connections', 'Use mTLS for service-to-DB authentication', 'Encrypt data at rest and in transit']
+        mits: ['Enable TLS 1.2+ for all DB connections', 'Use mTLS for service-to-DB authentication', 'Encrypt data at rest and in transit']
     },
 
     {
@@ -66,7 +72,8 @@ export const RULES = [
         check: (N, E, adj) => {
             const aff = [];
             for (const e of E) {
-                if (['PII', 'PHI', 'PCI'].includes(e.dataClass) && e.encryption === 'None') aff.push(e.to);
+                // Upgraded: flag if sensitive data AND no encryption (strength 0)
+                if (['PII', 'PHI', 'PCI'].includes(e.dataClass) && hasNoEncryption(e.encryption)) aff.push(e.to);
             }
             return aff.length ? { aff: [...new Set(aff)] } : null;
         },
@@ -101,7 +108,8 @@ export const RULES = [
         id: 'T-007', name: 'Unauthenticated Cache Access', stride: 'I', sev: 'high', like: 'Medium', imp: 'High', cat: 'Information Disclosure', ctrl: 'Confidentiality',
         check: (N, E, adj) => {
             const aff = [];
-            for (const e of E) { const t = N[e.to]; if (t && t.type === 'cache' && e.auth === 'None') aff.push(t.id); }
+            // Upgraded: flag if auth is absent (strength 0)
+            for (const e of E) { const t = N[e.to]; if (t && t.type === 'cache' && hasNoAuth(e.auth)) aff.push(t.id); }
             return aff.length ? { aff: [...new Set(aff)] } : null;
         },
         desc: 'Cache accessible without authentication leaks session data, tokens, or sensitive cached responses.',
@@ -142,7 +150,8 @@ export const RULES = [
             const aff = [];
             for (const e of E) {
                 const f = N[e.from], t = N[e.to];
-                if (f && t && f.trust === 'internal' && t.trust === 'restricted' && e.auth === 'None') aff.push(t.id);
+                // Upgraded: flag if auth is absent (no auth at all) on internal→restricted edge
+                if (f && t && f.trust === 'internal' && t.trust === 'restricted' && hasNoAuth(e.auth)) aff.push(t.id);
             }
             const untrusted = Object.values(N).filter(n => ['untrusted', 'hostile'].includes(n.trust));
             const restricted = Object.values(N).filter(n => n.trust === 'restricted');
@@ -161,11 +170,27 @@ export const RULES = [
         id: 'T-011', name: 'HTTP on External Channel', stride: 'I', sev: 'high', like: 'High', imp: 'Medium', cat: 'Information Disclosure', ctrl: 'Confidentiality',
         check: (N, E, adj) => {
             const aff = [];
-            for (const e of E) { const f = N[e.from]; if (f && ['internet', 'user'].includes(f.type) && e.protocol === 'HTTP') aff.push(e.to); }
+            for (const e of E) {
+                if (e.protocol !== 'HTTP') continue;
+                const fromNode = N[e.from];
+                const toNode = N[e.to];
+                const fromZone = getNodeTrustZone(fromNode);
+                const toZone = getNodeTrustZone(toNode);
+
+                // Phase 3: Context-aware check
+                // Only flag if at least one endpoint is internet-facing or DMZ
+                // Internal east-west HTTP (internal→internal) is a LOW warning only
+                const isExternal = ['internet', 'dmz'].includes(fromZone) || ['internet', 'dmz'].includes(toZone);
+                const isExternalSource = fromNode && ['internet', 'user', 'attacker'].includes(fromNode.type);
+
+                if (isExternalSource || isExternal) {
+                    aff.push(e.to);
+                }
+            }
             return aff.length ? { aff: [...new Set(aff)] } : null;
         },
-        desc: 'Unencrypted HTTP on external-facing connections. Susceptible to MITM, credential theft, session hijacking.',
-        mits: ['Enforce HTTPS via HSTS', 'Redirect all HTTP to HTTPS', 'Configure TLS 1.2+ with strong cipher suites']
+        desc: 'Unencrypted HTTP on an external-facing or DMZ-crossing connection. Susceptible to MITM, credential theft, and session hijacking. Note: HTTP between purely internal services is a low-severity concern; this flag indicates external exposure.',
+        mits: ['Enforce HTTPS via HSTS header on all external endpoints', 'Redirect all HTTP to HTTPS at the load balancer', 'Configure TLS 1.2+ with strong cipher suites (ECDHE+AES-GCM)', 'For internal east-west traffic: consider upgrading to HTTPS as defence-in-depth']
     },
 
     {
@@ -295,6 +320,128 @@ export const RULES = [
         ]
     },
 
+    // ── NEW T-019: Deprecated TLS Version ────────────────────────────────────
+    {
+        id: 'T-019', name: 'Deprecated TLS Version in Use', stride: 'I', sev: 'high', like: 'High', imp: 'High', cat: 'Information Disclosure', ctrl: 'Confidentiality',
+        check: (N, E, adj) => {
+            const aff = [];
+            for (const e of E) {
+                if (hasDeprecatedTLS(e.encryption)) {
+                    if (e.to) aff.push(e.to);
+                    if (e.from) aff.push(e.from);
+                }
+            }
+            return aff.length ? { aff: [...new Set(aff)] } : null;
+        },
+        desc: 'TLS 1.0 or TLS 1.1 is in use on this connection. Both versions are formally deprecated (RFC 8996, 2021) and contain known vulnerabilities: POODLE (CVE-2014-3566), BEAST (CVE-2011-3389), and CRIME. PCI-DSS v3.2+ requires TLS 1.2 minimum.',
+        mits: [
+            'Upgrade immediately to TLS 1.3 (preferred) or TLS 1.2 with strong cipher suites',
+            'Disable TLS 1.0 and 1.1 at the load balancer, API gateway, and server config',
+            'Run ssl-enum-ciphers (nmap) or Qualys SSL Labs scan to verify deprecation',
+            'PCI-DSS 3.2+: TLS 1.2 is the mandated minimum — failing this is a compliance violation'
+        ]
+    },
+
+    // ── NEW T-020: Weak Authentication Method ────────────────────────────────
+    {
+        id: 'T-020', name: 'Weak Authentication Method (Basic Auth)', stride: 'S', sev: 'high', like: 'High', imp: 'High', cat: 'Spoofing', ctrl: 'Authentication',
+        check: (N, E, adj) => {
+            const aff = [];
+            for (const e of E) {
+                // Flag Basic Auth specifically — it's auth, but trivially weak
+                if (hasWeakAuth(e.auth)) {
+                    if (e.to) aff.push(e.to);
+                    if (e.from) aff.push(e.from);
+                }
+            }
+            return aff.length ? { aff: [...new Set(aff)] } : null;
+        },
+        desc: 'Basic Authentication encodes credentials as base64 in the Authorization header. It provides no signing, no token expiry, no identity federation, and is trivially decoded if TLS is absent or intercepted. OWASP recommends retiring Basic Auth in favour of OAuth2, JWT, or mTLS for all service-to-service calls.',
+        mits: [
+            'Replace Basic Auth with JWT (OAuth2) or mTLS on service-to-service connections',
+            'If Basic Auth must remain, enforce TLS 1.2+ and rotate credentials frequently',
+            'Never use Basic Auth across trust boundary crossings (internet → DMZ)',
+            'Implement API key management with automatic rotation as a minimum step-up'
+        ]
+    },
+
+    // ── Phase 3 NEW: T-021 Protocol / Zone Mismatch ─────────────────────────
+    {
+        id: 'T-021', name: 'Protocol Used Outside Allowed Trust Zone', stride: 'T', sev: 'critical', like: 'High', imp: 'High', cat: 'Tampering', ctrl: 'Integrity',
+        check: (N, E, adj) => {
+            const aff = [];
+            const findings = []; // store detail for desc override
+
+            for (const e of E) {
+                const protocol = e.protocol;
+                if (!protocol) continue;
+                const policy = PROTOCOL_POLICY[protocol];
+                if (!policy || !policy.allowedZones) continue;
+
+                const fromNode = N[e.from];
+                const toNode = N[e.to];
+                if (!fromNode || !toNode) continue;
+
+                const fromZone = getNodeTrustZone(fromNode);
+                const toZone = getNodeTrustZone(toNode);
+
+                // Skip HTTP — handled by T-011
+                if (protocol === 'HTTP') continue;
+
+                // Check if either endpoint is outside the allowed zones
+                const fromViolation = isZoneViolation(fromZone, policy.allowedZones);
+                const toViolation = isZoneViolation(toZone, policy.allowedZones);
+
+                if (fromViolation || toViolation) {
+                    // Use the most dangerous zone for severity calculation
+                    const worstZone = (TRUST_ZONE_RANK[fromZone] ?? 2) < (TRUST_ZONE_RANK[toZone] ?? 2)
+                        ? fromZone : toZone;
+
+                    // Temporarily override severity dynamically based on zone
+                    // (this finding severity is re-evaluated in deduplication)
+                    aff.push(fromNode.id, toNode.id);
+                    findings.push({
+                        protocol,
+                        fromLabel: fromNode.label || fromNode.id,
+                        toLabel: toNode.label || toNode.id,
+                        fromZone,
+                        toZone,
+                        severity: getViolationSeverity(worstZone, policy),
+                        reason: policy.reason,
+                    });
+                }
+            }
+
+            if (!aff.length) return null;
+
+            // Build a detailed description from all violations found
+            const protocolSummary = [...new Set(findings.map(f => f.protocol))].join(', ');
+            const violationDetail = findings.map(f =>
+                `${f.protocol} (${f.fromLabel} [${f.fromZone}] → ${f.toLabel} [${f.toZone}])`
+            ).join('; ');
+
+            return {
+                aff: [...new Set(aff)],
+                // Attach extra info for the desc override
+                _protocolSummary: protocolSummary,
+                _violationDetail: violationDetail,
+                _firstReason: findings[0]?.reason || '',
+                _severity: findings.reduce((worst, f) => {
+                    const rank = { low: 0, medium: 1, high: 2, critical: 3 };
+                    return (rank[f.severity] ?? 0) > (rank[worst] ?? 0) ? f.severity : worst;
+                }, 'medium'),
+            };
+        },
+        desc: 'A protocol is being used outside the network zones it was designed for. Internal-only protocols (Redis, SQL, AMQP, S3) exposed to internet or DMZ zones are a critical misconfiguration enabling direct exploitation.',
+        mits: [
+            'Move Redis/SQL/AMQP/S3 endpoints behind an internal API or service layer',
+            'Never expose database protocols directly across trust boundaries',
+            'Use an API gateway or service mesh to mediate all cross-zone communication',
+            'For Redis: disable all external network access and enforce Redis AUTH + ACL',
+            'For SQL: ensure the DB is only reachable from whitelisted internal service IPs'
+        ]
+    },
+
     // ── Enhanced Rule Engine (R-00x) ──
     {
         id: 'R-001', name: 'Broken Authentication', stride: 'S', sev: 'high', like: 'High', imp: 'High', cat: 'Spoofing', ctrl: 'Authentication',
@@ -305,7 +452,8 @@ export const RULES = [
                 if (nd.type === 'api') {
                     const propAuthFalse = nd.props && nd.props.auth === false;
                     const inEdges = E.filter(e => e.to === nd.id);
-                    const allEdgesUnauthenticated = inEdges.length > 0 && inEdges.every(e => e.auth === 'None');
+                    // Upgraded: flag if all inbound edges have no auth (strength 0)
+                    const allEdgesUnauthenticated = inEdges.length > 0 && inEdges.every(e => hasNoAuth(e.auth));
                     if (propAuthFalse || allEdgesUnauthenticated) aff.push(nd.id);
                 }
             }
@@ -324,7 +472,8 @@ export const RULES = [
                 if (nd.type === 'database') {
                     const propEncFalse = nd.props && nd.props.encryption === false;
                     const inEdges = E.filter(e => e.to === nd.id);
-                    const hasUnencryptedInbound = inEdges.some(e => e.encryption === 'None');
+                    // Upgraded: flag if any inbound edge has no encryption (strength 0)
+                    const hasUnencryptedInbound = inEdges.some(e => hasNoEncryption(e.encryption));
                     if (propEncFalse || hasUnencryptedInbound) aff.push(nd.id);
                 }
             }
@@ -341,7 +490,8 @@ export const RULES = [
             const aff = [];
             for (const e of E) {
                 const isHttp = e.protocol && e.protocol.toUpperCase() === 'HTTP';
-                const noEnc = !e.encryption || e.encryption === 'None';
+                // Upgraded: flag if no encryption (strength 0)
+                const noEnc = hasNoEncryption(e.encryption);
                 if (isHttp && noEnc) { aff.push(e.to); if (e.from) aff.push(e.from); }
             }
             return aff.length ? { aff: [...new Set(aff)] } : null;
@@ -358,7 +508,8 @@ export const RULES = [
             const aff = [];
             for (const e of E) {
                 const isSensitive = sensitiveClasses.includes(e.dataClass) || sensitiveClasses.includes(e.dataClassification);
-                const noEnc = !e.encryption || e.encryption === 'None';
+                // Upgraded: flag if no encryption (strength 0)
+                const noEnc = hasNoEncryption(e.encryption);
                 if (isSensitive && noEnc) { aff.push(e.to); if (e.from) aff.push(e.from); }
             }
             return aff.length ? { aff: [...new Set(aff)] } : null;
@@ -374,7 +525,8 @@ export const RULES = [
             const publicClasses = ['Public', 'public'];
             const aff = [];
             for (const e of E) {
-                const noAuth = !e.auth || e.auth === 'None';
+                // Upgraded: flag only if truly no auth (strength 0)
+                const noAuth = hasNoAuth(e.auth);
                 const dataClass = e.dataClass || e.dataClassification || 'Public';
                 const isNonPublic = !publicClasses.includes(dataClass);
                 if (noAuth && isNonPublic) { aff.push(e.to); if (e.from) aff.push(e.from); }
@@ -404,13 +556,15 @@ export const RULES = [
                     const pathToApi = findPath(client.id, api.id, adj);
                     if (!pathToApi) continue;
                     const edgeToApi = E.find(e => e.to === api.id && pathToApi.includes(e.from));
-                    const apiEdgeUnauthenticated = !edgeToApi || edgeToApi.auth === 'None';
+                    // Upgraded: flag only if truly no auth (strength 0)
+                    const apiEdgeUnauthenticated = !edgeToApi || hasNoAuth(edgeToApi.auth);
                     if (!apiEdgeUnauthenticated) continue;
                     for (const db of dbs) {
                         const pathToDb = findPath(api.id, db.id, adj);
                         if (!pathToDb) continue;
                         const edgeToDb = E.find(e => e.from === api.id && e.to === db.id);
-                        const dbEdgeUnauthenticated = !edgeToDb || edgeToDb.auth === 'None';
+                        // Upgraded: flag only if truly no auth on DB edge too
+                        const dbEdgeUnauthenticated = !edgeToDb || hasNoAuth(edgeToDb.auth);
                         if (dbEdgeUnauthenticated) { aff.push(client.id, api.id, db.id); }
                     }
                 }
@@ -419,7 +573,8 @@ export const RULES = [
                 const fromNd = N[e.from]; const toNd = N[e.to];
                 if (!fromNd || !toNd) continue;
                 const fromIsAdmin = fromNd.iamPriv === 'admin' || (fromNd.props && fromNd.props.role === 'admin');
-                const edgeNoAuth = !e.auth || e.auth === 'None';
+                // Upgraded: flag only if truly no auth (strength 0)
+                const edgeNoAuth = hasNoAuth(e.auth);
                 if (fromIsAdmin && edgeNoAuth && toNd.type === 'database') { aff.push(fromNd.id, toNd.id); }
             }
             return aff.length ? { aff: [...new Set(aff)] } : null;
@@ -428,6 +583,7 @@ export const RULES = [
         mits: ['Enforce strict role-based access control (RBAC) on all API→DB connections', 'Require mTLS for service-to-database authentication', 'Apply least privilege: never use admin credentials for application DB connections', 'Implement database proxies (e.g. AWS RDS Proxy) to enforce connection-level AuthZ']
     },
 ];
+
 
 /**
  * DATA MODEL NORMALIZATION
@@ -473,6 +629,7 @@ export function runAnalysis() {
     if (!Object.keys(S.nodes).length) { alert('Add components to the DFD first.'); return; }
     document.querySelectorAll('.node-pills').forEach(p => p.innerHTML = '');
     S.threats = [];
+    S.findings = [];
     // Step 1: Normalize
     normalizeNodes(S.nodes);
     normalizeEdges(S.edges);
@@ -485,7 +642,9 @@ export function runAnalysis() {
             // Build location names from affected node IDs
             const affIds = res.aff || [];
             const locationNames = [...new Set(affIds.map(nid => S.nodes[nid]?.label || nid).filter(Boolean))];
-            S.threats.push({ ...rule, affected: affIds, locationNames });
+            const threat = { ...rule, affected: affIds, locationNames };
+            scoreThreat(threat); // Phase 4: attach CVSSv3.1 score
+            S.threats.push(threat);
             affIds.forEach(nid => {
                 const pp2 = document.getElementById('pills-' + nid);
                 if (!pp2 || pp2.querySelector(`[data-t="${rule.id}"]`)) return;
@@ -514,7 +673,9 @@ export function runAnalysis() {
     for (const ct of customThreats) {
         const ctAffIds = ct.affected || [];
         const ctLocationNames = [...new Set(ctAffIds.map(nid => S.nodes[nid]?.label || nid).filter(Boolean))];
-        S.threats.push({ ...ct, affected: ctAffIds, locationNames: ctLocationNames });
+        const ctThreat = { ...ct, affected: ctAffIds, locationNames: ctLocationNames };
+        scoreThreat(ctThreat); // Phase 4: attach CVSSv3.1 score to custom rules too
+        S.threats.push(ctThreat);
         ctAffIds.forEach(nid => {
             const pp2 = document.getElementById('pills-' + nid);
             if (!pp2 || pp2.querySelector(`[data-t="${ct.id}"]`)) return;
@@ -539,6 +700,9 @@ export function runAnalysis() {
     // Step 4: Full unified analysis pipeline
     runFullAnalysis(S.nodes, S.edges);
 
+    // Step 5: Deduplicate — build S.findings from raw S.threats
+    S.findings = deduplicateThreats(S.threats);
+
     renderDetected();
     const cnts = { S: 0, T: 0, R: 0, I: 0, D: 0, E: 0 };
     S.threats.forEach(t => cnts[t.stride] = (cnts[t.stride] || 0) + 1);
@@ -546,7 +710,7 @@ export function runAnalysis() {
     const apCount = S_attackPaths.length;
     const bvCount = S_boundaryFindings.length;
     document.getElementById('statusBar').textContent =
-        `Analysis complete — ${S.threats.length} threats · ${apCount} attack paths · ${bvCount} boundary violations`;
+        `Analysis complete — ${S.findings.length} findings (${S.threats.length} raw) · ${apCount} attack paths · ${bvCount} boundary violations`;
     document.getElementById('stab3').classList.add('done');
     const apBadge = document.getElementById('apTabBadge');
     if (apBadge) apBadge.textContent = apCount + bvCount;

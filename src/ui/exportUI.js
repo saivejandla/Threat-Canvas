@@ -8,7 +8,6 @@ import { calculateMaturityMetrics, buildExecSummaryHTML } from './execSummary.js
 import { redraw } from './renderSVG.js';
 import { createNode, makeDrag, clearCanvas } from './canvasUI.js';
 import { goStep } from './scopeUI.js';
-import { runAnalysis } from '../engine/threatEngine.js';
 import { renderTrustZoneOverlays } from './trustZones.js';
 import { zoomFit } from './zoomPan.js';
 import { upHint } from '../utils/helpers.js';
@@ -107,7 +106,7 @@ export function loadProject(input) {
             document.getElementById('canvas').appendChild(el);
         });
         redraw(); upHint(S.nodes); goStep(2);
-        setTimeout(() => { runAnalysis(); zoomFit(); setTimeout(renderTrustZoneOverlays, 150); document.getElementById('statusBar').textContent = `Project loaded — ${S.threats.length} threats detected`; }, 250);
+        setTimeout(() => { zoomFit(); setTimeout(renderTrustZoneOverlays, 150); document.getElementById('statusBar').textContent = `Project loaded — click Analyze to run threat detection`; }, 250);
         input.value = '';
     };
     reader.readAsText(file);
@@ -140,5 +139,5 @@ export function loadExample() {
     const [uId, iId, aId, wId, lbId, wsId, apiId, dbId, cId, stId, idpId, siemId] = ids;
     [[uId, wId, 'HTTPS', 'Internal', 'JWT', 'TLS 1.3', 'No'], [iId, wId, 'HTTPS', 'Public', 'None', 'TLS 1.2 (strong)', 'Yes — Internet to DMZ'], [aId, wId, 'HTTP', 'Internal', 'None', 'None', 'Yes — Internet to DMZ'], [wId, lbId, 'HTTPS', 'Internal', 'API Key', 'TLS 1.3', 'No'], [lbId, wsId, 'HTTP', 'Internal', 'None', 'None', 'No'], [lbId, apiId, 'HTTPS', 'Confidential', 'JWT', 'TLS 1.3', 'No'], [wsId, stId, 'S3', 'Confidential', 'IAM Role', 'TLS 1.3', 'Yes — Internal to Restricted'], [apiId, dbId, 'SQL', 'PII', 'None', 'None', 'Yes — Internal to Restricted'], [apiId, cId, 'Redis', 'Confidential', 'None', 'TLS 1.2 (strong)', 'No'], [apiId, idpId, 'HTTPS', 'Confidential', 'OAuth2', 'TLS 1.3', 'No'], [wsId, siemId, 'TCP', 'Internal', 'API Key', 'TLS 1.2 (strong)', 'No'], [apiId, siemId, 'TCP', 'Internal', 'API Key', 'TLS 1.2 (strong)', 'No']].forEach(([from, to, p, d, a, e, tb]) => S.edges.push({ id: 'e' + S.nextId++, from, to, protocol: p, dataClass: d, auth: a, encryption: e, trustBoundary: tb, _atk: false, _atkColor: null }));
     redraw(); upHint(S.nodes);
-    setTimeout(() => { runAnalysis(); requestAnimationFrame(() => requestAnimationFrame(() => { zoomFit(); setTimeout(renderTrustZoneOverlays, 150); })); }, 250);
+    setTimeout(() => { requestAnimationFrame(() => requestAnimationFrame(() => { zoomFit(); setTimeout(renderTrustZoneOverlays, 150); })); document.getElementById('statusBar').textContent = 'Example loaded — press Analyze (or A) to run threat analysis'; }, 250);
 }

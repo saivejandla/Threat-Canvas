@@ -13,7 +13,8 @@ export const S = {
     simInt: null, // setInterval handle
     pkt: 0,    // packet counter
     trig: 0,    // attack trigger counter
-    threats: [],   // ThreatObject[]
+    threats: [],   // ThreatObject[] — raw rule outputs (internal use only)
+    findings: [],  // FindingObject[] — deduplicated user-facing list
     cmRows: {},   // { [threatId]: { response, status } }
 };
 

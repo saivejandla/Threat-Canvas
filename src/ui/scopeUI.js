@@ -10,7 +10,6 @@ export function goStep(n) {
     document.querySelectorAll('.step-panel').forEach((p, i) => p.classList.toggle('active', i === n - 1));
     document.querySelectorAll('.step-tab').forEach((t, i) => t.classList.toggle('active', i === n - 1));
     const isC = n === 2;
-    document.getElementById('simBar').style.display = isC ? 'flex' : 'none';
     document.getElementById('mainToolbar').style.display = isC ? 'none' : 'flex';
     if (isC && !Object.keys(S.nodes).length) {
         // Directly set viewport variables via zoomReset-like logic

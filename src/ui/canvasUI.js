@@ -120,7 +120,7 @@ export function clearCanvas() {
     if (apCon) apCon.innerHTML = '<div style="text-align:center;color:var(--text3);padding:24px 0;font-size:12px">Run analysis to detect attack paths</div>';
     document.querySelectorAll('.trust-zone-overlay').forEach(el => el.remove());
     Object.keys(S.nodes).forEach(id => { const el = document.getElementById(id); if (el) el.remove(); });
-    S.nodes = {}; S.edges = []; S.threats = []; S.cmRows = {}; S.nextId = 1;
+    S.nodes = {}; S.edges = []; S.threats = []; S.findings = []; S.cmRows = {}; S.nextId = 1;
     import('../state/state.js').then(mod => { mod.setBlastSourceId(null); mod.resetBlastState(); });
     document.getElementById('svgLayer').querySelectorAll('path,text,rect').forEach(e => e.remove());
     document.getElementById('detectedThreats').innerHTML = '<div style="text-align:center;color:var(--text3);padding:24px 0;font-size:12px">Build DFD then press Analyze</div>';
