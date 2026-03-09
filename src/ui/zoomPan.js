@@ -76,18 +76,14 @@ export function initZoomPan() {
 
     cw.addEventListener('wheel', e => {
         e.preventDefault();
-        if (e.ctrlKey || e.metaKey) {
-            const delta = e.deltaY > 0 ? -1 : 1;
-            const cwr = cw.getBoundingClientRect();
-            const pivot = { x: e.clientX - cwr.left, y: e.clientY - cwr.top };
-            const idx = ZOOM_STEPS.findIndex(z => Math.abs(z - vpZ) < 0.01);
-            const cur = idx < 0 ? 4 : idx;
-            const next = Math.max(0, Math.min(ZOOM_STEPS.length - 1, cur + delta));
-            _zoomAround(ZOOM_STEPS[next], pivot);
-        } else {
-            vpX -= e.deltaX; vpY -= e.deltaY;
-            _applyViewport();
-        }
+        // Plain scroll OR Ctrl+scroll both zoom, centered on cursor
+        const cwr = cw.getBoundingClientRect();
+        const pivot = { x: e.clientX - cwr.left, y: e.clientY - cwr.top };
+        const delta = e.deltaY > 0 ? -1 : 1;
+        const idx = ZOOM_STEPS.findIndex(z => Math.abs(z - vpZ) < 0.01);
+        const cur = idx < 0 ? 4 : idx;
+        const next = Math.max(0, Math.min(ZOOM_STEPS.length - 1, cur + delta));
+        _zoomAround(ZOOM_STEPS[next], pivot);
     }, { passive: false });
 
     // Middle-mouse pan

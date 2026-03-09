@@ -317,6 +317,10 @@
             <div class="zoom-sep"></div>
             <button class="zoom-btn" id="zoomFitBtn" title="Fit all nodes in view">⊡</button>
             <button class="zoom-btn" id="zoomResetBtn" title="Reset to 100%">1:1</button>
+            <div class="zoom-sep"></div>
+            <button class="zoom-btn" id="autoLayoutBtn" title="Auto-arrange nodes left-to-right (trust-zone ordered)"
+              style="font-size:11px;padding:3px 9px;letter-spacing:.3px;font-weight:800;color:var(--accent)">⚡
+              Auto-Layout</button>
           </div>
         </div>
         <div class="rpanel" id="rpanel">
@@ -372,13 +376,6 @@
               Analyze Architecture</button>
             <button class="btn btn-ghost" style="width:100%;font-size:11px;margin-bottom:14px" id="clearBtn">Clear
               Canvas</button>
-            <div class="rp-title">⚔️ Attack Simulation</div>
-            <button class="btn btn-ghost" style="width:100%;font-size:11px;margin-bottom:7px" id="simToggleBtn">▶ Start
-              Traffic Sim</button>
-            <div class="atk-btn" data-attack="sqli">💉 SQL Injection</div>
-            <div class="atk-btn" data-attack="ddos">💥 DDoS Flood</div>
-            <div class="atk-btn" data-attack="lateral">↔️ Lateral Movement</div>
-            <div class="atk-btn" data-attack="exfil">📤 Data Exfiltration</div>
           </div>
 
           <!-- ── Blast mode content ── -->
@@ -486,8 +483,10 @@
                 <tr>
                   <th>ID</th>
                   <th>Threat</th>
+                  <th>Affected Nodes</th>
                   <th>STRIDE</th>
                   <th>Severity</th>
+                  <th>CVSSv3</th>
                   <th>Likelihood</th>
                   <th>Impact</th>
                   <th>Risk</th>
@@ -497,7 +496,8 @@
               </thead>
               <tbody id="cmTbody">
                 <tr>
-                  <td colspan="9" style="text-align:center;color:var(--text3);padding:28px">Run analysis in Step 2 first
+                  <td colspan="11" style="text-align:center;color:var(--text3);padding:28px">Run analysis in Step 2
+                    first
                   </td>
                 </tr>
               </tbody>
@@ -735,16 +735,7 @@
 
   </div><!-- /main -->
 
-  <!-- SIM BAR -->
-  <div class="sim-bar" id="simBar" style="display:none">
-    <div class="sim-dot" id="simDot"></div>
-    <span id="simLbl" style="color:var(--text3)">IDLE</span>
-    <div class="tb-sep"></div>
-    <span>Packets: <span class="sv" id="pktCnt">0</span></span>
-    <span>Attacks triggered: <span class="sv" style="color:var(--crit)" id="trigCnt">0</span></span>
-    <div style="margin-left:auto;font-size:11px;color:var(--text2)">DEL = delete selected node • A = analyze • Click
-      edge label = edit/delete connection</div>
-  </div>
+
   <div class="toolbar" id="mainToolbar">
     <span>Step 1: Scope → Step 2: DFD + Threats → Step 3: Countermeasures → Step 4: Assess</span>
     <div class="tb-sep"></div>
