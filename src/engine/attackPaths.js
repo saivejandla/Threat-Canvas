@@ -119,7 +119,34 @@ export function detectBoundaryViolations(nodes, edges) {
                 mits: ['Enforce mTLS at every trust boundary crossing', 'Require strong authentication (JWT/OAuth2) for cross-zone calls', 'Deploy an API gateway or service mesh at zone boundaries', 'Use network micro-segmentation to enforce zone isolation'],
                 affected: [srcId, tgtId],
             });
+
+            // FIX-1: Spoofing threat for external entity nodes at trust boundary crossings.
+            // STRIDE mandates: any external entity crossing a trust boundary without auth
+            // generates a Spoofing threat — its identity cannot be verified.
+            const externalTypes = ['internet', 'user', 'attacker'];
+            if (noAuth && externalTypes.includes(source.type)) {
+                findings.push({
+                    id: 'SP-' + edge.id, type: 'spoofing', ruleType: 'edge',
+                    threat: 'External Identity Spoofing at Trust Boundary',
+                    name: 'External Identity Spoofing at Trust Boundary',
+                    stride: 'S', sev: 'high', sevKey: 'high',
+                    owasp: 'A07:2021 Identification and Authentication Failures',
+                    severity: 'High', edgeId: edge.id, srcZone, tgtZone,
+                    sourceName: source.label || srcId, targetName: target.label || tgtId,
+                    sourceId: srcId, targetId: tgtId,
+                    desc: `${source.label || srcId} (${srcZone}) crosses into ${target.label || tgtId} (${tgtZone}) without authentication. The identity of the external entity cannot be verified — any actor can impersonate this ${source.type} and send requests as if they were a legitimate user.`,
+                    like: 'High', imp: 'High',
+                    mits: [
+                        'Require authentication at every trust boundary entry point (JWT, OAuth2, mTLS)',
+                        'Implement MFA for all user-facing entry points',
+                        'Deploy an IdP to centralize identity verification across zones',
+                        'Use API gateway with mandatory auth policy on all inbound routes',
+                    ],
+                    affected: [srcId, tgtId],
+                });
+            }
         }
+
     });
     return findings;
 }

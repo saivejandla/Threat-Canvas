@@ -97,11 +97,19 @@ export const RULES = [
     {
         id: 'T-006', name: 'No Audit Trail / SIEM', stride: 'R', sev: 'medium', like: 'Medium', imp: 'Medium', cat: 'Repudiation', ctrl: 'Non-Repudiation',
         check: (N, E, adj) => {
-            const s = Object.values(N).some(n => n.type === 'siem');
-            return (Object.keys(N).length > 2 && !s) ? { aff: [] } : null;
+            const hasSiem = Object.values(N).some(n => n.type === 'siem');
+            if (Object.keys(N).length <= 2 || hasSiem) return null;
+            // Escalate to HIGH when an admin-privileged node can reach a restricted data store:
+            // no SIEM on an admin tool is a CRITICAL compliance gap (PCI-DSS, SOX, HIPAA)
+            const hasAdminNode = Object.values(N).some(n =>
+                n.iamPriv === 'admin' || (n.props && n.props.role === 'admin'));
+            const hasRestrictedDB = Object.values(N).some(n =>
+                n.trust === 'restricted' && ['database', 'storage'].includes(n.type));
+            const escalate = hasAdminNode && hasRestrictedDB;
+            return { aff: [], sev: escalate ? 'high' : 'medium' };
         },
-        desc: 'No SIEM or audit component. Operations are unlogged; attacks go undetected; repudiation is enabled.',
-        mits: ['Deploy SIEM (Splunk, Elastic, Wazuh)', 'Enable centralized audit logging', 'Implement digital signatures on critical ops', 'Set up anomaly detection alerts']
+        desc: 'No SIEM or audit component. Operations are unlogged; attacks go undetected; repudiation is enabled. For systems with admin access to restricted data stores, this is a HIGH-severity compliance gap under PCI-DSS, SOX, and HIPAA.',
+        mits: ['Deploy SIEM (Splunk, Elastic, Wazuh)', 'Enable centralized audit logging for all privileged actions', 'Implement digital signatures on critical operations', 'Set up anomaly detection alerts for admin activities']
     },
 
     {
@@ -123,12 +131,22 @@ export const RULES = [
             const stores = Object.values(N).filter(n => n.type === 'storage');
             const aff = [];
             for (const src of untrusted)
-                for (const st of stores)
-                    if (findPath(src.id, st.id, adj)) aff.push(st.id);
+                for (const st of stores) {
+                    const path = findPath(src.id, st.id, adj);
+                    if (!path) continue;
+                    // Only flag if the path has no auth on any edge
+                    const pathEdges = [];
+                    for (let i = 0; i < path.length - 1; i++) {
+                        const e = E.find(ed => ed.from === path[i] && ed.to === path[i + 1]);
+                        if (e) pathEdges.push(e);
+                    }
+                    const hasUnauthEdge = pathEdges.some(e => hasNoAuth(e.auth));
+                    if (hasUnauthEdge) aff.push(st.id);
+                }
             return aff.length ? { aff: [...new Set(aff)] } : null;
         },
-        desc: 'Object storage is reachable from an untrusted node through one or more hops. Risk of public bucket misconfiguration or indirect access.',
-        mits: ['Block all public access by default', 'Use pre-signed URLs with short TTL', 'Enable S3 Block Public Access policy']
+        desc: 'Object storage is reachable from an untrusted node via a path that includes at least one unauthenticated edge. Risk of public bucket misconfiguration or indirect unauthorized access.',
+        mits: ['Block all public access by default (S3 Block Public Access)', 'Use pre-signed URLs with short TTL for any user-facing access', 'Require auth on every edge leading to storage — no open paths']
     },
 
     {
@@ -144,26 +162,50 @@ export const RULES = [
         mits: ['Add load balancer with health checks', 'Deploy across multiple availability zones', 'Implement circuit breaker patterns']
     },
 
+    // T-010a: Tampering — unauthenticated write path to restricted data store
     {
-        id: 'T-010', name: 'Lateral Movement to Data Store', stride: 'E', sev: 'high', like: 'Medium', imp: 'High', cat: 'Elevation of Privilege', ctrl: 'Authorization',
+        id: 'T-010a', name: 'Unauthenticated Write to Restricted Data Store', stride: 'T', sev: 'high', like: 'Medium', imp: 'High', cat: 'Tampering', ctrl: 'Integrity',
         check: (N, E, adj) => {
             const aff = [];
             for (const e of E) {
                 const f = N[e.from], t = N[e.to];
-                // Upgraded: flag if auth is absent (no auth at all) on internal→restricted edge
-                if (f && t && f.trust === 'internal' && t.trust === 'restricted' && hasNoAuth(e.auth)) aff.push(t.id);
+                // Flag if writing to a restricted-trust data store with no auth
+                if (f && t && t.trust === 'restricted' && hasNoAuth(e.auth)) aff.push(t.id);
             }
+            // Multi-hop: untrusted → restricted data store via any path, only if path has a weak link
             const untrusted = Object.values(N).filter(n => ['untrusted', 'hostile'].includes(n.trust));
             const restricted = Object.values(N).filter(n => n.trust === 'restricted');
             for (const src of untrusted)
                 for (const dst of restricted) {
                     const path = findPath(src.id, dst.id, adj);
-                    if (path && path.length > 2) aff.push(dst.id);
+                    if (!path || path.length <= 2) continue;
+                    // Only flag if the path contains at least one unauthenticated edge
+                    const pathHasNoAuth = path.slice(0, -1).some((nodeId, i) => {
+                        const e = E.find(ed => ed.from === nodeId && ed.to === path[i + 1]);
+                        return e && hasNoAuth(e.auth);
+                    });
+                    if (pathHasNoAuth) aff.push(dst.id);
                 }
             return aff.length ? { aff: [...new Set(aff)] } : null;
         },
-        desc: 'Direct or multi-hop path exists from internal/untrusted node to restricted data store without authentication. Enables lateral movement post-compromise.',
-        mits: ['Require mTLS between services and data stores', 'Use service mesh with AuthZ policies', 'Least-privilege DB credentials per service']
+        desc: 'A restricted-zone data store is reachable via an unauthenticated connection. An attacker can modify, corrupt, or delete stored data without presenting credentials. Data integrity is not guaranteed.',
+        mits: ['Require mTLS between all services and data stores', 'Use service mesh with AuthZ policies (OPA, Istio)', 'Least-privilege DB credentials per service — no shared admin accounts']
+    },
+
+    // T-010b: Information Disclosure — unauthenticated read path to restricted data store
+    {
+        id: 'T-010b', name: 'Unauthenticated Read from Restricted Data Store', stride: 'I', sev: 'high', like: 'Medium', imp: 'High', cat: 'Information Disclosure', ctrl: 'Confidentiality',
+        check: (N, E, adj) => {
+            const aff = [];
+            for (const e of E) {
+                const t = N[e.to];
+                // Flag any edge landing on a restricted-zone node with no auth
+                if (t && t.trust === 'restricted' && hasNoAuth(e.auth)) aff.push(t.id);
+            }
+            return aff.length ? { aff: [...new Set(aff)] } : null;
+        },
+        desc: 'A restricted-zone data store receives connections without authentication. Any actor with network access can read sensitive, regulated, or confidential data without presenting credentials.',
+        mits: ['Enforce authentication on all data store connections', 'Enable row-level security (RLS) in the database', 'Use database activity monitoring (DAM) to detect anomalous read patterns', 'Classify data and apply column-level encryption for PII/PCI/PHI']
     },
 
     {
@@ -196,11 +238,23 @@ export const RULES = [
     {
         id: 'T-012', name: 'No Centralized Identity Provider', stride: 'S', sev: 'medium', like: 'Medium', imp: 'Medium', cat: 'Spoofing', ctrl: 'Authentication',
         check: (N, E, adj) => {
-            // Suppress for small models (≤5 nodes) — too noisy for beginners
+            // FIX-A: Suppress on small models
             if (Object.keys(N).length <= 5) return null;
             const idp = Object.values(N).some(n => n.type === 'idp');
-            const usr = Object.values(N).some(n => n.type === 'user');
-            return (usr && !idp) ? { aff: [] } : null;
+            if (idp) return null; // IdP present — rule does not apply
+
+            // FIX-A: Only fire if at least one external entity has a path to a
+            // compute node and there is no IdP node anywhere on that path.
+            const external = Object.values(N).filter(n => ['internet', 'user', 'attacker', 'browser'].includes(n.type));
+            const compute  = Object.values(N).filter(n => ['webserver', 'api', 'microservice', 'lambda', 'function'].includes(n.type));
+            if (!external.length || !compute.length) return null;
+
+            const aff = [];
+            for (const src of external)
+                for (const dst of compute)
+                    if (findPath(src.id, dst.id, adj)) { aff.push(dst.id); break; }
+
+            return aff.length ? { aff: [] } : null;  // report system-level, not node-specific
         },
         desc: 'No centralized identity provider. Fragmented authentication increases credential exposure and inconsistent session handling.',
         mits: ['Implement SSO with SAML 2.0 or OIDC', 'Centralize AuthN in Identity Provider', 'Enable MFA for all user accounts']
@@ -209,18 +263,32 @@ export const RULES = [
     {
         id: 'T-013', name: 'Excessive Trust Boundary Traversal', stride: 'E', sev: 'high', like: 'Medium', imp: 'High', cat: 'Elevation of Privilege', ctrl: 'Authorization',
         check: (N, E, adj) => {
-            const untrusted = Object.values(N).filter(n => ['untrusted', 'hostile'].includes(n.trust));
+            const untrusted  = Object.values(N).filter(n => ['untrusted', 'hostile'].includes(n.trust));
             const restricted = Object.values(N).filter(n => n.trust === 'restricted');
             const aff = [];
             for (const src of untrusted)
                 for (const dst of restricted) {
                     const path = findPath(src.id, dst.id, adj);
-                    if (path && trustBoundaryCrossings(path, E) >= 2) aff.push(dst.id);
+                    if (!path || trustBoundaryCrossings(path, E) < 2) continue;
+
+                    // Auth-aware suppression: if EVERY boundary-crossing edge on the path
+                    // has strong auth (JWT / OAuth2 / IAM Role / mTLS, strength ≥ 3),
+                    // this is an intentional multi-tier design — not a finding.
+                    const crossingEdges = [];
+                    for (let i = 0; i < path.length - 1; i++) {
+                        const e = E.find(ed => ed.from === path[i] && ed.to === path[i + 1]);
+                        if (e && e.trustBoundary !== 'No') crossingEdges.push(e);
+                    }
+                    const allStrongAuth = crossingEdges.length > 0 &&
+                        crossingEdges.every(e => (AUTH_STRENGTH[e.auth] ?? 0) >= 3);
+                    if (allStrongAuth) continue;  // suppress — every crossing has strong auth
+
+                    aff.push(dst.id);
                 }
             return aff.length ? { aff: [...new Set(aff)] } : null;
         },
-        desc: 'A path crosses two or more trust boundaries to reach a restricted node. Each boundary crossing is a privilege escalation opportunity if controls are inconsistent.',
-        mits: ['Enforce re-authentication at each trust boundary', 'Implement consistent AuthZ policy across zones', 'Use network micro-segmentation between trust levels']
+        desc: 'A path from an untrusted source crosses two or more trust boundaries to reach a restricted node, and at least one crossing lacks strong authentication. Each weakly-authenticated boundary crossing is a privilege escalation opportunity.',
+        mits: ['Enforce strong authentication (JWT, mTLS, OAuth2) at EVERY trust boundary entry point', 'Implement consistent AuthZ policy across zones — do not rely on network position alone', 'Use network micro-segmentation so untrusted nodes cannot directly reach restricted zones']
     },
 
     {
@@ -259,24 +327,42 @@ export const RULES = [
     {
         id: 'T-016', name: 'Missing Rate Limiting on Auth Endpoint', stride: 'D', sev: 'high', like: 'High', imp: 'Medium', cat: 'Denial of Service', ctrl: 'Availability',
         check: (N, E, adj) => {
-            const aff = [];
+            // Guard: suppress only on trivial sketches (≤3 nodes) or empty diagrams
+            if (Object.keys(N).length <= 3 || E.length === 0) return null;
+
             const external = Object.values(N).filter(n => ['internet', 'user', 'attacker'].includes(n.type));
             const authSvcs = Object.values(N).filter(n => ['api', 'webserver', 'idp'].includes(n.type));
+            if (!external.length || !authSvcs.length) return null;
+
+            // FIX-P0: Use reachability (findPath) instead of direct-edge check so
+            // multi-hop topologies (Browser→WAF→LB→WebServer) are correctly detected.
+            const hasExternalReachable = authSvcs.some(svc =>
+                external.some(ext => findPath(ext.id, svc.id, adj) !== null)
+            );
+            if (!hasExternalReachable) return null;
+
+            const aff = [];
             for (const src of external) {
                 for (const svc of authSvcs) {
                     const path = findPath(src.id, svc.id, adj);
                     if (!path) continue;
                     const pathEdges = [];
                     for (let i = 0; i < path.length - 1; i++) { const e = E.find(ed => ed.from === path[i] && ed.to === path[i + 1]); if (e) pathEdges.push(e); }
-                    const noProtection = pathEdges.every(e => e.auth === 'None');
-                    const noGuard = !path.slice(1, -1).some(id => ['waf', 'firewall', 'loadbalancer'].includes(N[id]?.type));
-                    if (noProtection && noGuard) aff.push(svc.id);
+                    // FIX-P1: flag weak auth (Basic Auth, strength ≤1) — susceptible to brute force/credential stuffing
+                    const noOrWeakProtection = pathEdges.every(e => (AUTH_STRENGTH[e.auth] ?? 0) <= 1);
+                    // Guard: WAF/Firewall/LB on the path suppresses ONLY if the node has rateLimit:true.
+                    // A WAF that is present but not configured for rate limiting does NOT suppress.
+                    const guardNode = path.slice(1, -1)
+                        .map(id => N[id])
+                        .find(n => n && ['waf', 'firewall', 'loadbalancer'].includes(n.type));
+                    const noGuard = !guardNode || guardNode.rateLimit !== true;
+                    if (noOrWeakProtection && noGuard) aff.push(svc.id);
                 }
             }
             return aff.length ? { aff: [...new Set(aff)] } : null;
         },
-        desc: 'An external actor can reach an authentication-handling service with no rate limiting or throttling controls on the path. Enables brute force and credential stuffing.',
-        mits: ['Implement rate limiting at WAF or API gateway', 'Add CAPTCHA on login endpoints', 'Deploy account lockout and progressive delay policies']
+        desc: 'An external actor can reach an authentication-handling service with no (or only weak) rate limiting or throttling controls on the path. Enables brute force and credential stuffing attacks. Basic Auth is especially vulnerable — credentials can be harvested with ~1000 requests at no cost.',
+        mits: ['Implement rate limiting at WAF or API gateway (e.g., 5 req/min per IP on login)', 'Add CAPTCHA or proof-of-work on login endpoints after N failures', 'Deploy account lockout and progressive delay policies', 'Replace Basic Auth with MFA-capable mechanisms (OAuth2, FIDO2)']
     },
 
     {
@@ -286,37 +372,65 @@ export const RULES = [
             const internal = Object.values(N).filter(n => ['internal', 'restricted'].includes(n.trust));
             const aff = [];
             for (const src of internet) {
-                const reachable = reachableFrom(src.id, adj);
-                internal.forEach(nd => { if (reachable.has(nd.id)) aff.push(nd.id); });
-            }
-            return aff.length ? { aff: [...new Set(aff)] } : null;
-        },
-        desc: 'Internet-facing nodes have a directed path to internal services with no explicit trust validation. Supply chain or dependency tampering can propagate inward.',
-        mits: ['Pin and verify all external dependencies (SBOMs)', 'Enforce input validation at every trust boundary', 'Use network egress filtering to limit outbound connections']
-    },
-
-    {
-        id: 'T-018', name: 'Missing Data Classification on Data Store', stride: 'I', sev: 'medium', like: 'Medium', imp: 'High', cat: 'Information Disclosure', ctrl: 'Confidentiality',
-        check: (N, E, adj) => {
-            const computeTypes = new Set(['webserver', 'api', 'microservice', 'lambda']);
-            const dataTypes = new Set(['database', 'cache', 'storage']);
-            const aff = [];
-            for (const e of E) {
-                const src = N[e.from], dst = N[e.to];
-                if (!src || !dst) continue;
-                if (computeTypes.has(src.type) && dataTypes.has(dst.type)) {
-                    const dc = e.dataClass || e.dataClassification;
-                    if (!dc || dc === 'Public') aff.push(dst.id);
+                for (const nd of internal) {
+                    // Guard-aware: only flag if the path has no WAF/Firewall/LB
+                    const path = findPath(src.id, nd.id, adj);
+                    if (!path) continue;
+                    const hasGuard = path.slice(1, -1).some(id =>
+                        ['waf', 'firewall', 'loadbalancer'].includes(N[id]?.type));
+                    if (!hasGuard) aff.push(nd.id);
                 }
             }
             return aff.length ? { aff: [...new Set(aff)] } : null;
         },
-        desc: 'A compute node connects to a data store, but the data flow has no sensitivity classification. If this data store holds PII, financial data, or health records, this connection needs encryption and access controls. Set the data classification on this edge to get more targeted threat analysis.',
+        desc: 'An internet-facing node has a directed path to an internal service with no WAF, Firewall, or Load Balancer guarding the path. Supply chain or dependency tampering can propagate inward without interception.',
+        mits: ['Pin and verify all external dependencies (SBOMs)', 'Enforce WAF or Firewall between internet and all internal services', 'Use network egress filtering to limit outbound connections']
+    },
+
+    {
+        // FIX-B: Upgraded T-018 — PII auto-inference for unlabeled compute→data-store edges
+        // Does NOT fire when the edge is already classified as sensitive (PII/PHI/PCI/Confidential/Restricted).
+        id: 'T-018', name: 'Sensitive Data Path Without Classification', stride: 'I', sev: 'high', like: 'Medium', imp: 'High', cat: 'Information Disclosure', ctrl: 'Confidentiality',
+        check: (N, E, adj) => {
+            const COMPUTE = new Set(['webserver', 'api', 'microservice', 'lambda', 'function']);
+            const DATA    = new Set(['database', 'cache', 'storage', 'datastore']);
+            // Classes that are already classified sensitive — skip these (existing rules cover them)
+            const SENSITIVE = new Set(['pii', 'PII', 'phi', 'PHI', 'pci', 'PCI',
+                                       'confidential', 'Confidential', 'restricted', 'Restricted']);
+            // Classes that are too vague to count as classified
+            const UNCLASSIFIED = new Set(['public', 'Public', 'internal', 'Internal', '', undefined, null]);
+
+            const risky = E.filter(e => {
+                const src = N[e.from], dst = N[e.to];
+                if (!src || !dst) return false;
+                const dc = e.dataClass || e.dataClassification;
+                // Skip if already classified as sensitive — existing rules handle these
+                if (SENSITIVE.has(dc)) return false;
+                // Only flag if the edge is unclassified (public/internal/empty)
+                return COMPUTE.has(src.type) && DATA.has(dst.type) && UNCLASSIFIED.has(dc);
+            });
+
+            if (risky.length === 0) return null;
+            return {
+                aff: [...new Set(risky.map(e => e.to))],
+                desc: 'A compute node writes to a data store but the data flow has no sensitivity ' +
+                      'classification. If this store holds PII, financial data, or health records, ' +
+                      'this connection requires encryption and access controls. Set the data ' +
+                      'classification on this edge to enable targeted threat analysis.',
+                mits: [
+                    'Classify the data on this edge (PII, Confidential, Restricted)',
+                    'Enable TLS/encryption on all data store connections regardless of zone',
+                    'Apply least-privilege database credentials scoped to the calling service',
+                    'Audit what data this store actually holds and label it accordingly'
+                ]
+            };
+        },
+        desc: 'A compute node writes to a data store but the data flow has no sensitivity classification. If this store holds PII, financial data, or health records, this connection requires encryption and access controls.',
         mits: [
-            'Classify the data flowing on this edge (PII, Internal, Confidential)',
-            'Enable TLS/encryption on all data store connections',
-            'Implement least-privilege database access controls',
-            'In threat modeling, data classification drives your security decisions — start here'
+            'Classify the data on this edge (PII, Confidential, Restricted)',
+            'Enable TLS/encryption on all data store connections regardless of zone',
+            'Apply least-privilege database credentials scoped to the calling service',
+            'Audit what data this store actually holds and label it accordingly'
         ]
     },
 
@@ -449,18 +563,19 @@ export const RULES = [
         check: (N, E, adj) => {
             const aff = [];
             for (const nd of Object.values(N)) {
-                if (nd.type === 'api') {
+                // Expanded: check api, database, and cache nodes — all can have auth disabled
+                if (['api', 'database', 'cache'].includes(nd.type)) {
                     const propAuthFalse = nd.props && nd.props.auth === false;
                     const inEdges = E.filter(e => e.to === nd.id);
-                    // Upgraded: flag if all inbound edges have no auth (strength 0)
+                    // Flag if all inbound edges have no auth (strength 0)
                     const allEdgesUnauthenticated = inEdges.length > 0 && inEdges.every(e => hasNoAuth(e.auth));
                     if (propAuthFalse || allEdgesUnauthenticated) aff.push(nd.id);
                 }
             }
             return aff.length ? { aff: [...new Set(aff)] } : null;
         },
-        desc: 'API endpoint has authentication disabled. Any actor can make unauthorized calls, spoof identities, and access protected resources without credentials. Maps to OWASP A07:2021.',
-        mits: ['Enable JWT or OAuth2 on all API endpoints', 'Implement API Gateway with mandatory authentication policy', 'Add MFA for privileged API operations', 'Audit all API routes for missing auth middleware']
+        desc: 'Endpoint or data store has authentication disabled or all inbound connections are unauthenticated. Any actor can make unauthorized calls, spoof identities, and access protected resources without credentials. Maps to OWASP A07:2021.',
+        mits: ['Enable JWT or OAuth2 on all API endpoints', 'Require authentication on all database connections (mTLS or IAM role)', 'Implement API Gateway with mandatory authentication policy', 'Add MFA for privileged API and admin operations']
     },
 
     {
@@ -519,13 +634,13 @@ export const RULES = [
     },
 
     {
-        id: 'R-005', name: 'Unauthorized Data Access', stride: 'E', sev: 'high', like: 'High', imp: 'High', cat: 'Elevation of Privilege', ctrl: 'Authorization',
+        id: 'R-005', name: 'Unauthorized Data Access', stride: 'I', sev: 'high', like: 'High', imp: 'High', cat: 'Information Disclosure', ctrl: 'Confidentiality',
         owasp: 'A01:2021 Broken Access Control',
         check: (N, E, adj) => {
             const publicClasses = ['Public', 'public'];
             const aff = [];
             for (const e of E) {
-                // Upgraded: flag only if truly no auth (strength 0)
+                // Flag only if truly no auth (strength 0)
                 const noAuth = hasNoAuth(e.auth);
                 const dataClass = e.dataClass || e.dataClassification || 'Public';
                 const isNonPublic = !publicClasses.includes(dataClass);
@@ -533,7 +648,7 @@ export const RULES = [
             }
             return aff.length ? { aff: [...new Set(aff)] } : null;
         },
-        desc: 'Non-public data flows across a connection with no authentication. Any actor with network access can read or exfiltrate internal, confidential, or regulated data without presenting credentials. Maps to OWASP A01:2021.',
+        desc: 'Non-public data flows across a connection with no authentication. Any actor with network access can read or exfiltrate internal, confidential, or regulated data without presenting credentials. Unauthorized data reads are an Information Disclosure (STRIDE I) threat. Maps to OWASP A01:2021.',
         mits: ['Require authentication on every connection carrying non-public data', 'Implement zero-trust: authenticate every request regardless of network zone', 'Use API keys or JWT for service-to-service calls', 'Log and alert on unauthenticated access to sensitive endpoints']
     },
 
@@ -582,6 +697,190 @@ export const RULES = [
         desc: 'A privilege escalation path exists: a client can reach an admin-role API, and that API connects to a database without authentication. An attacker exploiting the unauthenticated API gains full database access via admin privileges. Maps to OWASP A01:2021.',
         mits: ['Enforce strict role-based access control (RBAC) on all API→DB connections', 'Require mTLS for service-to-database authentication', 'Apply least privilege: never use admin credentials for application DB connections', 'Implement database proxies (e.g. AWS RDS Proxy) to enforce connection-level AuthZ']
     },
+
+    // ── Shostack Fix: Repudiation (R) Rules ─────────────────────────────────
+
+    {
+        id: 'R-007', name: 'No Per-Operation Audit Logging on Critical Endpoints',
+        stride: 'R', sev: 'high', like: 'High', imp: 'High', cat: 'Repudiation', ctrl: 'Non-Repudiation',
+        owasp: 'A09:2021 Security Logging and Monitoring Failures',
+        check: (N, E, adj) => {
+            // Flag APIs or webservers reachable from users/internet with no SIEM in graph
+            const hasSIEM = Object.values(N).some(n => n.type === 'siem');
+            if (hasSIEM) return null; // SIEM present — covered
+            const externalSrc = Object.values(N).filter(n => ['user', 'internet', 'attacker'].includes(n.type));
+            const services = Object.values(N).filter(n => ['api', 'webserver'].includes(n.type));
+            const aff = [];
+            for (const src of externalSrc)
+                for (const svc of services)
+                    if (findPath(src.id, svc.id, adj)) aff.push(svc.id);
+            return aff.length ? { aff: [...new Set(aff)] } : null;
+        },
+        desc: 'User-reachable API or web endpoints have no SIEM or centralized audit trail. Without per-operation logging, an attacker can deny performing malicious actions ("I didn\'t do that") and incidents become impossible to reconstruct. Shostack: Repudiation threats require non-repudiation controls at each operation, not just a system-wide log.',
+        mits: [
+            'Deploy a SIEM (Splunk, Elastic, Wazuh) and route all application logs to it',
+            'Log every state-changing operation: who, what, when, from where',
+            'Implement tamper-evident audit logs (append-only, signed with HMAC)',
+            'Forward audit events in real-time — batch logging misses live attacks'
+        ]
+    },
+
+    {
+        id: 'R-008', name: 'Log Tampering / Deletion Path via Hostile Node',
+        stride: 'R', sev: 'critical', like: 'Medium', imp: 'High', cat: 'Repudiation', ctrl: 'Non-Repudiation',
+        check: (N, E, adj) => {
+            // An attacker-type node with a path to a SIEM can tamper with audit logs
+            const attackers = Object.values(N).filter(n => n.type === 'attacker' || n.trust === 'hostile');
+            const siems = Object.values(N).filter(n => n.type === 'siem');
+            if (!attackers.length || !siems.length) return null;
+            const aff = [];
+            for (const atk of attackers)
+                for (const siem of siems)
+                    if (findPath(atk.id, siem.id, adj)) aff.push(siem.id, atk.id);
+            return aff.length ? { aff: [...new Set(aff)] } : null;
+        },
+        desc: 'A hostile node has a directed path to the SIEM or audit log store. An attacker who can write to or delete audit logs can erase evidence of their actions — the ultimate repudiation attack. Shostack: audit logs must be beyond the reach of any compromised component.',
+        mits: [
+            'Make SIEM write-only from application nodes — no delete permissions',
+            'Stream logs to an isolated, append-only storage account (separate AWS account/Azure sub)',
+            'Cryptographically sign log batches so tampering is detectable',
+            'Block all inbound connections to SIEM from internet and DMZ zones'
+        ]
+    },
+
+    {
+        id: 'R-009', name: 'No Digital Signature on Critical Data Flows',
+        stride: 'R', sev: 'medium', like: 'Medium', imp: 'Medium', cat: 'Repudiation', ctrl: 'Non-Repudiation',
+        check: (N, E, adj) => {
+            // Flag PII/PHI/PCI/financial flows between services that have no strong auth (signing)
+            const sensitiveClasses = ['PII', 'PHI', 'PCI', 'Financial', 'Confidential'];
+            const aff = [];
+            for (const e of E) {
+                const isSensitive = sensitiveClasses.includes(e.dataClass) || sensitiveClasses.includes(e.dataClassification);
+                // JWT/OAuth2/mTLS all include signing; Basic/None do not
+                const hasNoSigning = !e.auth || ['None', 'Basic Auth'].includes(e.auth);
+                if (isSensitive && hasNoSigning) { aff.push(e.to); if (e.from) aff.push(e.from); }
+            }
+            return aff.length ? { aff: [...new Set(aff)] } : null;
+        },
+        desc: 'Sensitive or regulated data flows (PII, PHI, PCI, Financial) are not protected by a signed authentication mechanism (JWT, mTLS). Without cryptographic signing, either party can deny sending or receiving the data — enabling repudiation of financial transactions, consent records, or access events.',
+        mits: [
+            'Use JWT with RS256 signing for all sensitive API flows — the signature proves origin',
+            'For financial or consent data: use HMAC request signing (AWS SigV4 style)',
+            'Implement mTLS for service-to-service flows carrying regulated data',
+            'Maintain an immutable receipt log (event sourcing) for all sensitive state changes'
+        ]
+    },
+
+    // ── Shostack Fix: Denial of Service (D) Rules ────────────────────────────
+
+    {
+        id: 'D-001', name: 'Database Resource Exhaustion / Lock Contention',
+        stride: 'D', sev: 'high', like: 'Medium', imp: 'High', cat: 'Denial of Service', ctrl: 'Availability',
+        check: (N, E, adj) => {
+            // Flag databases reachable from untrusted/internet with no rate limiting (no WAF/LB on path)
+            const dbs = Object.values(N).filter(n => n.type === 'database');
+            const external = Object.values(N).filter(n => ['internet', 'user', 'attacker'].includes(n.type));
+            if (!dbs.length || !external.length) return null;
+            const aff = [];
+            for (const src of external) {
+                for (const db of dbs) {
+                    const path = findPath(src.id, db.id, adj);
+                    if (!path) continue;
+                    // If no WAF/LB/Firewall on path, no throttling protection
+                    const noGuard = !path.slice(1, -1).some(id => ['waf', 'firewall', 'loadbalancer'].includes(N[id]?.type));
+                    if (noGuard) aff.push(db.id);
+                }
+            }
+            return aff.length ? { aff: [...new Set(aff)] } : null;
+        },
+        desc: 'A database is reachable from external sources with no throttling guard (WAF, Load Balancer, Firewall) on the path. An attacker can exhaust DB connection pools, trigger lock contention via long-running queries, or cause cascading failure. Shostack: DoS applies to every component, not just the network layer.',
+        mits: [
+            'Place all databases behind an internal API layer — never expose DB ports externally',
+            'Configure connection pool limits and query timeouts at the DB engine',
+            'Implement circuit breakers on all application → DB connections',
+            'Use read replicas to distribute load and prevent single-node exhaustion'
+        ]
+    },
+
+    {
+        id: 'D-002', name: 'Message Queue Flooding / Unbounded Ingestion',
+        stride: 'D', sev: 'medium', like: 'Medium', imp: 'High', cat: 'Denial of Service', ctrl: 'Availability',
+        check: (N, E, adj) => {
+            const queues = Object.values(N).filter(n => n.type === 'messagequeue');
+            if (!queues.length) return null;
+            const external = Object.values(N).filter(n => ['internet', 'user', 'attacker'].includes(n.type));
+            const aff = [];
+            for (const src of external)
+                for (const q of queues)
+                    if (findPath(src.id, q.id, adj)) aff.push(q.id);
+            return aff.length ? { aff: [...new Set(aff)] } : null;
+        },
+        desc: 'A message queue is reachable from external or untrusted nodes. An attacker can flood the queue with millions of messages, exhausting memory, blocking legitimate consumers, and causing cascading DoS across all downstream services. Shostack: queues are high-value DoS targets because their failure is amplified across the entire consumer graph.',
+        mits: [
+            'Enforce producer authentication — never allow unauthenticated queue writes',
+            'Set message size limits, queue depth limits, and TTL on all queues',
+            'Implement back-pressure: consumers signal overload and reject new messages',
+            'Use dead-letter queues to isolate poison messages and prevent infinite retry loops'
+        ]
+    },
+
+    {
+        id: 'D-003', name: 'Cache Stampede / Thundering Herd',
+        stride: 'D', sev: 'medium', like: 'Low', imp: 'High', cat: 'Denial of Service', ctrl: 'Availability',
+        check: (N, E, adj) => {
+            // Flag if cache is present AND there is a DB directly behind it — cache miss → DB flood
+            const caches = Object.values(N).filter(n => n.type === 'cache');
+            const dbs = Object.values(N).filter(n => n.type === 'database');
+            if (!caches.length || !dbs.length) return null;
+            // Only fire if multiple services hit the cache (>1 inbound edge to cache)
+            const aff = [];
+            for (const cache of caches) {
+                const inboundEdges = Object.values(N).filter(n => n.id !== cache.id).filter(n => (adj[n.id] || []).some(({ to }) => to === cache.id));
+                const hasDbBehind = dbs.some(db => findPath(cache.id, db.id, adj));
+                if (inboundEdges.length > 1 && hasDbBehind) aff.push(cache.id);
+            }
+            return aff.length ? { aff } : null;
+        },
+        desc: 'Multiple services share a cache backed by a database. If the cache expires or restarts, all services simultaneously miss and hammer the database — a "thundering herd" or "cache stampede." This can bring down both the cache and the database simultaneously. Shostack: DoS can be caused by your own system\'s failure modes, not just external attackers.',
+        mits: [
+            'Use probabilistic early expiration (jitter) to prevent synchronized cache misses',
+            'Implement cache warming on startup before accepting traffic',
+            'Use mutex/semaphore locks to allow only one request to rebuild a cache key',
+            'Deploy a multi-tier cache (L1 local + L2 Redis) to absorb stampede spikes'
+        ]
+    },
+
+    // ── FIX-8: Outbound External Dependency — Spoofing + Repudiation ────────────
+    {
+        id: 'T-022', name: 'Outbound Connection to Unverified External Service', stride: 'S', sev: 'high', like: 'Medium', imp: 'High', cat: 'Spoofing', ctrl: 'Authentication',
+        check: (N, E, adj) => {
+            // Internal/restricted nodes with outbound edges to internet-zone nodes
+            const internalTypes = new Set(['webserver', 'api', 'microservice', 'lambda', 'database', 'cache', 'storage', 'messagequeue']);
+            const externalNodeIds = new Set(Object.values(N)
+                .filter(n => n.type === 'internet' || n.trustZone === 'internet')
+                .map(n => n.id));
+            const aff = [];
+            for (const e of E) {
+                const fromNode = N[e.from];
+                const toNode = N[e.to];
+                if (!fromNode || !toNode) continue;
+                // Flag outbound from internal service to external node
+                if (internalTypes.has(fromNode.type) && externalNodeIds.has(toNode.id)) {
+                    aff.push(fromNode.id, toNode.id);
+                }
+            }
+            return aff.length ? { aff: [...new Set(aff)] } : null;
+        },
+        desc: 'An internal service makes outbound calls to an external entity (e.g., payment gateway, third-party API). The external service could be impersonated via DNS hijacking, BGP hijacking, or certificate spoofing. Additionally, the application has no control over the external party\'s audit logs, creating a Repudiation gap for any transactions made through this connection.',
+        mits: [
+            'Pin TLS certificates for external service endpoints (certificate pinning)',
+            'Validate external service identity using mutual TLS (mTLS)',
+            'Use a service mesh egress gateway to enforce outbound policy',
+            'Implement HMAC request signing so external parties cannot deny receiving requests',
+            'Log all outbound calls with request/response signatures for non-repudiation'
+        ]
+    },
 ];
 
 
@@ -615,11 +914,18 @@ export function normalizeNodes(nodes) {
     });
 }
 
-export function normalizeEdges(edges) {
+export function normalizeEdges(edges, nodes) {
+    const warnings = [];
     edges.forEach(e => {
         if (!e.normalizedProtocol) e.normalizedProtocol = (e.protocol || '').toUpperCase();
         if (!e.dataClassification) e.dataClassification = e.dataClass || 'Public';
+        // FIX-10: Collect validation warnings for malformed edges
+        if (nodes) {
+            if (!nodes[e.from]) warnings.push(`Connection '${e.id}': source node '${e.from}' not found — this edge was skipped.`);
+            if (!nodes[e.to]) warnings.push(`Connection '${e.id}': destination node '${e.to}' not found — this edge was skipped.`);
+        }
     });
+    return warnings;
 }
 
 /**
@@ -632,7 +938,13 @@ export function runAnalysis() {
     S.findings = [];
     // Step 1: Normalize
     normalizeNodes(S.nodes);
-    normalizeEdges(S.edges);
+    const dfdWarnings = normalizeEdges(S.edges, S.nodes);
+    // Display DFD validation warnings if any edges have missing endpoints
+    if (dfdWarnings.length) {
+        const warningBar = document.getElementById('statusBar');
+        if (warningBar) warningBar.textContent = `⚠ DFD Warnings: ${dfdWarnings.join(' | ')}`;
+        console.warn('[ThreatCanvas] DFD validation warnings:', dfdWarnings);
+    }
     // Step 2: Build graph
     const adj = buildAdjacency(S.nodes, S.edges);
     // Step 3: Evaluate rules
@@ -699,6 +1011,33 @@ export function runAnalysis() {
     }
     // Step 4: Full unified analysis pipeline
     runFullAnalysis(S.nodes, S.edges);
+
+    // Step 4b: Data Classification Severity Boost (Shostack Fix #3)
+    // If a threat affects a node holding PII/PHI/PCI data, upgrade severity one level.
+    const SENSITIVE_DC = new Set(['PII', 'PHI', 'PCI', 'Financial', 'Confidential', 'Restricted', 'secret', 'pii', 'phi', 'pci']);
+    const SEV_UP = { low: 'medium', medium: 'high', high: 'critical', critical: 'critical' };
+    // Build a set of node IDs that hold sensitive data (via node props OR inbound edge dataClass)
+    const sensitiveNodeIds = new Set();
+    Object.values(S.nodes).forEach(nd => {
+        const dc = nd.props?.dataClassification || nd.dataClassification || '';
+        if (SENSITIVE_DC.has(dc)) sensitiveNodeIds.add(nd.id);
+    });
+    S.edges.forEach(e => {
+        if (SENSITIVE_DC.has(e.dataClass) || SENSITIVE_DC.has(e.dataClassification)) {
+            if (e.to) sensitiveNodeIds.add(e.to);
+        }
+    });
+    // Boost severity for threats that affect sensitive nodes, and annotate them
+    S.threats.forEach(t => {
+        const affectsSensitive = (t.affected || []).some(nid => sensitiveNodeIds.has(nid));
+        if (affectsSensitive && t.sev !== 'critical') {
+            t._boosted = true;
+            t._origSev = t.sev;
+            t.sev = SEV_UP[t.sev] || t.sev;
+            // Re-score CVSS with updated severity
+            scoreThreat(t);
+        }
+    });
 
     // Step 5: Deduplicate — build S.findings from raw S.threats
     S.findings = deduplicateThreats(S.threats);

@@ -58,7 +58,26 @@ export const COMPONENT_THREATS = {
         { stride: 'T', sev: 'high', name: 'SQL / Command Injection', mits: ['Use parameterized queries only', 'Deploy WAF with OWASP Core Rule Set', 'Restrict DB account permissions'] },
         { stride: 'I', sev: 'high', name: 'Directory Traversal / File Exposure', mits: ['Restrict file system access to webroot', 'Disable directory listing', 'Validate all file path inputs'] },
         { stride: 'D', sev: 'medium', name: 'Resource Exhaustion / Slow Loris', mits: ['Set request size and timeout limits', 'Use reverse proxy (nginx) with connection limits', 'Implement circuit breakers'] },
+        {
+            stride: 'S', sev: 'high', name: 'Cross-Site Request Forgery (CSRF)',
+            mits: [
+                'Implement CSRF tokens (synchronizer token pattern) on all state-changing requests',
+                'Use SameSite=Strict or SameSite=Lax cookie attribute',
+                'Verify Origin and Referer headers on sensitive endpoints',
+                'Consider Double Submit Cookie pattern for stateless APIs'
+            ]
+        },
+        {
+            stride: 'S', sev: 'high', name: 'Session Fixation / Session Hijacking',
+            mits: [
+                'Regenerate session ID on every privilege level change (login, sudo, role switch)',
+                'Set Secure, HttpOnly, and SameSite flags on all session cookies',
+                'Enforce absolute and idle session timeouts',
+                'Bind session tokens to client IP or TLS channel binding where feasible'
+            ]
+        },
     ],
+
     api: [
         { stride: 'S', sev: 'critical', name: 'Broken Object Level Authorization (BOLA)', mits: ['Validate object ownership on every request', 'Never expose internal IDs directly', 'Implement row-level security'] },
         { stride: 'I', sev: 'high', name: 'Excessive Data Exposure', mits: ['Return only fields the client needs', 'Use response schemas (allowlists)', 'Log and alert on anomalous response sizes'] },
@@ -78,7 +97,7 @@ export const COMPONENT_THREATS = {
     ],
     cache: [
         { stride: 'I', sev: 'high', name: 'Sensitive Data Leakage via Cache', mits: ['Never cache auth tokens or PII unencrypted', 'Set appropriate TTLs and cache-control headers', 'Use Redis ACLs to restrict key access'] },
-        { stride: 'S', sev: 'high', name: 'Cache Poisoning', mits: ['Validate cache key inputs', 'Use separate cache namespaces per tenant', 'Monitor for unexpected cache writes'] },
+        { stride: 'T', sev: 'high', name: 'Cache Poisoning', mits: ['Validate cache key inputs', 'Use separate cache namespaces per tenant', 'Monitor for unexpected cache writes'] },
         { stride: 'D', sev: 'medium', name: 'Cache Stampede / Thundering Herd', mits: ['Implement cache-aside pattern with jitter', 'Use probabilistic early expiration', 'Set stale-while-revalidate headers'] },
     ],
     firewall: [
