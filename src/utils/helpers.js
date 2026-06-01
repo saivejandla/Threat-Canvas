@@ -3,6 +3,21 @@
  * Shared helpers used across UI and engine modules.
  */
 
+/**
+ * HTML-escape a user-controlled string before inserting into innerHTML.
+ * Prevents XSS via crafted node labels, edge names, or imported JSON values.
+ * Always use this when building HTML strings that include user data.
+ */
+export function escHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
 /** Severity → hex color */
 export function sc(s) {
     return { critical: '#ef4444', high: '#f97316', medium: '#facc15', low: '#34d399' }[s] || '#888';

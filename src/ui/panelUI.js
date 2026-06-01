@@ -7,6 +7,7 @@ import { runBlast, clearBlast } from '../engine/blastRadius.js';
 import { redraw } from './renderSVG.js';
 import { renderTrustZoneOverlays } from './trustZones.js';
 import { injectGlossaryTooltips } from '../utils/glossary.js';
+import { escHtml } from '../utils/helpers.js';
 
 export function setMode(mode) {
   setAppMode(mode);
@@ -41,7 +42,7 @@ export function showComponentThreats(nodeId) {
   section.innerHTML = `<div class="ctp-panel">
     <div class="ctp-header">
       <span class="ctp-icon">${def.icon}</span>
-      <span class="ctp-name">${nd.label}</span>
+      <span class="ctp-name">${escHtml(nd.label)}</span>
       <button class="ctp-close" id="ctpCloseBtn">✕</button>
     </div>
     <div style="display:flex;align-items:center;gap:6px;padding:6px 12px;background:var(--s3);border-bottom:1px solid var(--border)">
@@ -158,7 +159,7 @@ export function openEdgeEditor(edgeId) {
 
   section.innerHTML = `<div class="edge-editor">
     <div class="edge-editor-title">
-      <span>✏️ Edit: ${from?.label || '?'} → ${to?.label || '?'}</span>
+      <span>✏️ Edit: ${escHtml(from?.label || '?')} → ${escHtml(to?.label || '?')}</span>
       <button style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:13px" id="eeCloseBtn">✕</button>
     </div>
     <div class="ee-row">

@@ -25,12 +25,12 @@ const DEDUP_GROUPS = [
     {
         key: 'PLAINTEXT_CHANNEL',
         label: 'Plaintext / Unencrypted Channel',
-        ids: ['T-003', 'T-004', 'T-011', 'T-019', 'R-002', 'R-003', 'R-004'],
+        ids: ['T-003', 'T-004', 'T-011', 'T-019', 'R-002', 'R-003', 'R-004', 'T-010b', 'T-018'],
     },
     {
         key: 'MISSING_AUTH',
         label: 'Missing or Broken Authentication',
-        ids: ['T-002', 'T-020', 'R-001', 'R-005'],
+        ids: ['T-002', 'T-020', 'R-001', 'R-005', 'T-010a'],
     },
     {
         key: 'ACTIVE_ATTACK_PATH',
@@ -40,18 +40,23 @@ const DEDUP_GROUPS = [
     {
         key: 'TRUST_BOUNDARY',
         label: 'Insecure Trust Boundary Crossing',
-        // BV-* IDs are dynamic — matched by prefix below
-        ids: ['T-013', 'BV-'],
+        // BV-* and SP-* IDs are dynamic — matched by prefix below
+        ids: ['T-013', 'BV-', 'SP-'],
     },
     {
         key: 'LATERAL_MOVEMENT',
         label: 'Lateral Movement to Data Store',
-        ids: ['T-010', 'T-013'],
+        ids: ['T-010a', 'T-010b', 'T-013'],
     },
     {
         key: 'PROTOCOL_ZONE_MISMATCH',
         label: 'Protocol / Trust Zone Mismatch',
         ids: ['T-021'],   // standalone — protocol violations get a dedicated card
+    },
+    {
+        key: 'EXTERNAL_DEPENDENCY',
+        label: 'Outbound External Dependency Risk',
+        ids: ['T-022'],   // standalone — outbound spoofing gets its own card
     },
 ];
 

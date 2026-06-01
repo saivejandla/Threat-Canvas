@@ -4,14 +4,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Threat-Canvas — OWASP Threat Modeler</title>
+  <title>Threat Modelling</title>
   <link rel="stylesheet" href="src/styles/main.css">
 </head>
 
 <body>
   <header>
     <div class="logo">
-      <div class="logo-icon">🛡</div>Threat-<span>Canvas</span>
+      <div class="logo-icon">🛡</div>Threat <span>Modelling</span>
     </div>
     <div class="step-tabs">
       <div class="step-tab active" id="stab1"><span class="step-num">1</span> Scope</div>
@@ -586,75 +586,47 @@
               <div class="assess-lbl">Unmitigated</div>
             </div>
           </div>
-          <div style="font-size:13px;font-weight:800;margin-bottom:10px">✅ OWASP Completeness Checklist</div>
-          <div class="chk-item">
-            <div class="chk-ico">🏗</div>
-            <div>
-              <div class="chk-text">Data Flow Diagram</div>
-              <div class="chk-sub">Components and data flows drawn on canvas</div>
+          <!-- Shostack 4-Question Completeness Checker -->
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <div style="font-size:13px;font-weight:800">📋 Shostack Completeness Check</div>
+            <div style="display:flex;align-items:baseline;gap:6px">
+              <div id="completenessScore" style="font-size:22px;font-weight:900;color:var(--crit)">—</div>
+              <div id="completenessLabel" style="font-size:10px;color:var(--text3);font-weight:600">Run analysis</div>
             </div>
-            <div class="chk-status chk-fail" id="kDfd">✗ Missing</div>
           </div>
-          <div class="chk-item">
-            <div class="chk-ico">📋</div>
-            <div>
-              <div class="chk-text">Project Scoped</div>
-              <div class="chk-sub">App name, description, owner defined</div>
-            </div>
-            <div class="chk-status chk-fail" id="kScope">✗ Missing</div>
-          </div>
-          <div class="chk-item">
-            <div class="chk-ico">🚪</div>
-            <div>
-              <div class="chk-text">Entry / Exit Points</div>
-              <div class="chk-sub">Attack surface documented</div>
-            </div>
-            <div class="chk-status chk-fail" id="kEntry">✗ Missing</div>
-          </div>
-          <div class="chk-item">
-            <div class="chk-ico">🔑</div>
-            <div>
-              <div class="chk-text">Trust Levels Defined</div>
-              <div class="chk-sub">Access rights for external entities specified</div>
-            </div>
-            <div class="chk-status chk-fail" id="kTrust">✗ Missing</div>
-          </div>
-          <div class="chk-item">
-            <div class="chk-ico">💎</div>
-            <div>
-              <div class="chk-text">Assets Identified</div>
-              <div class="chk-sub">Physical and abstract assets inventoried</div>
-            </div>
-            <div class="chk-status chk-fail" id="kAssets">✗ Missing</div>
-          </div>
-          <div class="chk-item">
-            <div class="chk-ico">⚠️</div>
-            <div>
-              <div class="chk-text">Threat List</div>
-              <div class="chk-sub">STRIDE threats identified and documented</div>
-            </div>
-            <div class="chk-status chk-fail" id="kThreats">✗ Missing</div>
-          </div>
-          <div class="chk-item">
-            <div class="chk-ico">🛡</div>
-            <div>
-              <div class="chk-text">Countermeasure Register</div>
-              <div class="chk-sub">All threats have a mitigation response assigned</div>
-            </div>
-            <div class="chk-status chk-fail" id="kControls">✗ Missing</div>
-          </div>
-          <div class="chk-item">
-            <div class="chk-ico">📊</div>
-            <div>
-              <div class="chk-text">Risk Ranked</div>
-              <div class="chk-sub">Threats ranked by likelihood × impact (qualitative)</div>
-            </div>
-            <div class="chk-status chk-fail" id="kRisk">✗ Missing</div>
-          </div>
+
+          <!-- Q1 -->
+          <div style="font-size:9px;font-weight:800;letter-spacing:1px;color:var(--text3);text-transform:uppercase;margin-bottom:5px;margin-top:2px">Q1 — What are we working on?</div>
+          <div class="chk-item"><div class="chk-ico">🏗</div><div><div class="chk-text">DFD Drawn</div><div class="chk-sub">&gt;1 node and at least one edge on canvas</div></div><div class="chk-status chk-fail" id="kDfd">✗ Missing</div></div>
+          <div class="chk-item"><div class="chk-ico">📋</div><div><div class="chk-text">Project Scoped</div><div class="chk-sub">App name, description &amp; owner filled in</div></div><div class="chk-status chk-fail" id="kScope">✗ Missing</div></div>
+          <div class="chk-item"><div class="chk-ico">🚪</div><div><div class="chk-text">Entry / Exit Points</div><div class="chk-sub">Attack surface documented</div></div><div class="chk-status chk-fail" id="kEntry">✗ Missing</div></div>
+          <div class="chk-item"><div class="chk-ico">🔑</div><div><div class="chk-text">Trust Levels &amp; Boundaries</div><div class="chk-sub">Access rights and trust zones defined</div></div><div class="chk-status chk-fail" id="kTrust">✗ Missing</div></div>
+          <div class="chk-item"><div class="chk-ico">💎</div><div><div class="chk-text">Assets Identified</div><div class="chk-sub">High-value assets inventoried</div></div><div class="chk-status chk-fail" id="kAssets">✗ Missing</div></div>
+
+          <!-- Q2 -->
+          <div style="font-size:9px;font-weight:800;letter-spacing:1px;color:var(--text3);text-transform:uppercase;margin-bottom:5px;margin-top:10px">Q2 — What can go wrong? (STRIDE)</div>
+          <div class="chk-item"><div class="chk-ico">⚠️</div><div><div class="chk-text">Analysis Run</div><div class="chk-sub">Threats found via STRIDE evaluation</div></div><div class="chk-status chk-fail" id="kThreats">✗ Missing</div></div>
+          <div class="chk-item"><div class="chk-ico" style="color:#f87171">S</div><div><div class="chk-text">Spoofing</div><div class="chk-sub">Identity / credential abuse checked</div></div><div class="chk-status chk-fail" id="kSTRIDE_S">✗ Missing</div></div>
+          <div class="chk-item"><div class="chk-ico" style="color:#fb923c">T</div><div><div class="chk-text">Tampering</div><div class="chk-sub">Data / code integrity checked</div></div><div class="chk-status chk-fail" id="kSTRIDE_T">✗ Missing</div></div>
+          <div class="chk-item"><div class="chk-ico" style="color:#a78bfa">R</div><div><div class="chk-text">Repudiation</div><div class="chk-sub">Audit trail &amp; non-repudiation checked</div></div><div class="chk-status chk-fail" id="kSTRIDE_R">✗ Missing</div></div>
+          <div class="chk-item"><div class="chk-ico" style="color:#60a5fa">I</div><div><div class="chk-text">Information Disclosure</div><div class="chk-sub">Confidentiality threats checked</div></div><div class="chk-status chk-fail" id="kSTRIDE_I">✗ Missing</div></div>
+          <div class="chk-item"><div class="chk-ico" style="color:#f97316">D</div><div><div class="chk-text">Denial of Service</div><div class="chk-sub">Availability threats checked</div></div><div class="chk-status chk-fail" id="kSTRIDE_D">✗ Missing</div></div>
+          <div class="chk-item"><div class="chk-ico" style="color:#34d399">E</div><div><div class="chk-text">Elevation of Privilege</div><div class="chk-sub">Authorization threats checked</div></div><div class="chk-status chk-fail" id="kSTRIDE_E">✗ Missing</div></div>
+          <div class="chk-item"><div class="chk-ico">🗺</div><div><div class="chk-text">Attack Paths Analyzed</div><div class="chk-sub">Entry → high-value node paths found</div></div><div class="chk-status chk-fail" id="kPaths">✗ Missing</div></div>
+
+          <!-- Q3 -->
+          <div style="font-size:9px;font-weight:800;letter-spacing:1px;color:var(--text3);text-transform:uppercase;margin-bottom:5px;margin-top:10px">Q3 — What are we doing about it?</div>
+          <div class="chk-item"><div class="chk-ico">🛡</div><div><div class="chk-text">Countermeasures Assigned</div><div class="chk-sub">All threats have a response (Mitigate/Accept/Transfer)</div></div><div class="chk-status chk-fail" id="kControls">✗ Missing</div></div>
+          <div class="chk-item"><div class="chk-ico">🔴</div><div><div class="chk-text">No Unmitigated Criticals</div><div class="chk-sub">All CRITICAL findings have an active response</div></div><div class="chk-status chk-fail" id="kRisk">✗ Missing</div></div>
+
+          <!-- Q4 -->
+          <div style="font-size:9px;font-weight:800;letter-spacing:1px;color:var(--text3);text-transform:uppercase;margin-bottom:5px;margin-top:10px">Q4 — Did we do a good job?</div>
+          <div class="chk-item"><div class="chk-ico">🏷</div><div><div class="chk-text">Data Flows Classified</div><div class="chk-sub">Edges tagged with data class (PII/PHI/PCI/Internal)</div></div><div class="chk-status chk-fail" id="kDataClass">✗ Missing</div></div>
+          <div class="chk-item"><div class="chk-ico">🎯</div><div><div class="chk-text">All STRIDE Categories Covered</div><div class="chk-sub">At least one finding in each of S,T,R,I,D,E</div></div><div class="chk-status chk-fail" id="kStrideAll">✗ Missing</div></div>
+
           <div style="display:flex;gap:10px;margin-top:14px">
             <button class="btn btn-primary" id="refreshAssessBtn">↻ Refresh</button>
-            <button class="btn btn-primary" style="background:#1d4ed8;flex:1" id="openExecBtn">📋 Generate Executive
-              Summary</button>
+            <button class="btn btn-primary" style="background:#1d4ed8;flex:1" id="openExecBtn">📋 Generate Executive Summary</button>
             <button class="btn btn-ghost" id="exportBtn2">⬇ Export Full Report</button>
           </div>
         </div>

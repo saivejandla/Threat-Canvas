@@ -17,13 +17,14 @@ import { renderTrustZoneOverlays } from './ui/trustZones.js';
 import { upHint } from './utils/helpers.js';
 import { openRuleEditor, closeRuleEditor, initRuleEditor } from './ui/ruleEditorUI.js';
 
-document.addEventListener('DOMContentLoaded', () => {
+function initApp() {
     // Init
     document.getElementById('docDate').value = new Date().toISOString().split('T')[0];
     setMode('analyze');
     initZoomPan();
     initCanvas();
     initRuleEditor();
+
 
     // ── Step Tabs ──
     document.querySelectorAll('.step-tab').forEach((tab, i) => {
@@ -116,4 +117,12 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelector('#panel5 .btn-primary.btn-sm')?.addEventListener('click', saveProject);
     document.querySelector('#panel5 input[type="file"]')?.addEventListener('change', function () { loadProject(this); });
     document.querySelector('#panel5 .btn-ghost.btn-sm[style]')?.addEventListener('click', exportReport);
-});
+}
+
+// Run immediately if DOM is already parsed (handles deferred module timing edge case),
+// otherwise wait for DOMContentLoaded.
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initApp);
+} else {
+    initApp();
+}
